@@ -38,7 +38,14 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // API routes are excluded from the redirect. They authenticate themselves and
+  // return JSON status codes; bouncing them to /login would hand a `fetch()` a
+  // 307 and an HTML page, which silently breaks every client error path.
+  const isApi = path.startsWith('/api/');
+
   const isPublic =
+    isApi ||
     path.startsWith('/login') ||
     path.startsWith('/auth') ||
     path === '/' ||
