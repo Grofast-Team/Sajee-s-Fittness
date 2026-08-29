@@ -1,26 +1,140 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Design tokens.
+ *
+ * Direction: calm, clinical-but-warm. Deliberately not the aggressive
+ * black-and-neon aesthetic of most fitness apps - the audience is a beginner
+ * who is nervous about this, not a bodybuilder. Cyan and green read as
+ * "health" without shouting.
+ *
+ * Two deliberate deviations from the generated design system:
+ *   1. Body text is Inter, not Raleway. Raleway's low-contrast strokes and
+ *      lining figures are hard to read at the small numeric sizes this app is
+ *      full of. Lora is kept for headings, where its warmth is the point.
+ *   2. Type is not oversized. "Exaggerated minimalism" suits a luxury landing
+ *      page; here, big numbers everywhere would make a calorie target feel like
+ *      a verdict.
+ */
+
+@theme {
+  /* Supplied by next/font in `layout.tsx`, with real fallbacks so the app is
+     legible before the webfonts land. */
+  --font-display: var(--font-lora), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-brand-50: #ecfeff;
+  --color-brand-100: #cffafe;
+  --color-brand-200: #a5f3fc;
+  --color-brand-300: #67e8f9;
+  --color-brand-400: #22d3ee;
+  --color-brand-500: #06b6d4;
+  --color-brand-600: #0891b2;
+  --color-brand-700: #0e7490;
+  --color-brand-800: #155e75;
+  --color-brand-900: #164e63;
+
+  --color-grow-500: #10b981;
+  --color-grow-600: #059669;
+  --color-grow-700: #047857;
+
+  --color-warn-500: #f59e0b;
+  --color-danger-500: #dc2626;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --bg: #f7fbfc;
+  --surface: #ffffff;
+  --surface-2: #f0f7f9;
+  --border: #d9e9ee;
+  --fg: #10333d;
+  --fg-muted: #4d7784;
+  --fg-subtle: #6f939e;
+  --primary: #0e7490;
+  --primary-fg: #ffffff;
+  --accent: #047857;
+  --ring: #0891b2;
+  --shadow-card: 0 1px 2px rgb(16 51 61 / 0.05), 0 8px 24px -12px rgb(16 51 61 / 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme='light']) {
+    --bg: #0a1416;
+    --surface: #0f1e22;
+    --surface-2: #14282d;
+    --border: #1e3b42;
+    --fg: #e6f4f7;
+    --fg-muted: #9dbcc4;
+    --fg-subtle: #7ba0aa;
+    --primary: #22d3ee;
+    --primary-fg: #062026;
+    --accent: #34d399;
+    --ring: #22d3ee;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
   }
 }
 
+:root[data-theme='dark'] {
+  --bg: #0a1416;
+  --surface: #0f1e22;
+  --surface-2: #14282d;
+  --border: #1e3b42;
+  --fg: #e6f4f7;
+  --fg-muted: #9dbcc4;
+  --fg-subtle: #7ba0aa;
+  --primary: #22d3ee;
+  --primary-fg: #062026;
+  --accent: #34d399;
+  --ring: #22d3ee;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  /* Room for the fixed bottom navigation, plus the iOS home indicator. */
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+/* Numeric readouts line up in columns and never reflow as digits change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Every interactive element keeps a visible focus ring. Removing these is the
+   single most common accessibility regression in a redesign. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
