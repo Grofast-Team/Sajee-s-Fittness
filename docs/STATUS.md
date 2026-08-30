@@ -4,7 +4,8 @@ An honest account of what exists, what is partial, and what has not been built.
 The brief's rule 98 applies to this document as much as to the UI: nothing is
 described as working that has not been run.
 
-Verified by `npm test` (143 passing), `npm run build` (clean), `eslint` (clean),
+Verified by `npm test` (143 passing), `npm run test:rls` (18 passing against a
+live project), `npm run build` (clean), `eslint` (clean),
 and — as of this revision — **against a live Supabase project and a production
 Vercel deployment**, not only in sample mode.
 
@@ -14,8 +15,8 @@ Live verification performed:
 - 51 foods, 71 aliases, 34 serving units, 12 exercises, 4 workouts, 6 lessons seeded
 - Alias search exercised against the real RPC: thosai/dosai/idly/sambhar/thayir/
   "meal maker" all resolve correctly; gibberish returns nothing
-- **Cross-user RLS proven with two real accounts**: B cannot read A's rows, cannot
-  insert rows owned by A (42501), and an UPDATE against A's profile affects nothing
+- **Cross-user RLS proven with two real accounts and now automated**: see
+  `tests/rls/isolation.test.ts` — 18 tests walking every user-owned table
 - Anonymous key returns empty on every user table
 - `handle_new_user()` bootstraps profile/lifestyle/food_profile on signup
 - Rollup triggers verified: food, steps, water and sleep all land in `daily_logs`,
@@ -157,8 +158,7 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
    written and typechecks, but it has only been exercised in sample mode — no
    Supabase project was available in this environment. Until someone runs it,
    treat the write paths as unproven.
-2. **RLS test suite** — before any real user data exists, not after.
-3. **Sleep entry UI.** `logSleep` exists but nothing calls it, so
+2. **Sleep entry UI.** `logSleep` exists but nothing calls it, so
    `daily_logs.sleep_minutes` stays null and the adherence engine's sleep
    component always scores zero for real users.
 4. **Workout completion.** The session and week grid on Activity are still fixed
