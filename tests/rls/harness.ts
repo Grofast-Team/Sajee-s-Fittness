@@ -108,6 +108,38 @@ export async function deleteTestUser(user: TestUser): Promise<void> {
   await adminClient().auth.admin.deleteUser(user.id);
 }
 
+/**
+ * The only email domain this suite is ever allowed to delete.
+ *
+ * This project holds real accounts. A cleanup routine that deletes "test-looking"
+ * users on a live project is one bad regex away from deleting somebody's health
+ * history, so the guard is an exact suffix match and nothing else.
+ */
+const TEST_EMAIL_SUFFIX = '@example.test';
+
+export function isTestAccount(email: string | undefined): boolean {
+  return typeof email === 'string' && email.endsWith(TEST_EMAIL_SUFFIX);
+}
+
+/**
+ * Remove users orphaned by an interrupted run.
+ *
+ * A failure partway through `beforeAll` leaves one user created and the other
+ * not, so the paired teardown never runs. Without this sweep those accumulate
+ * on the project.
+ */
+export async function sweepOrphanedTestUsers(): Promise<number> {
+  const admin = adminClient();
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  if (error || !data) return 0;
+
+  const orphans = data.users.filter((u) => isTestAccount(u.email));
+  for (const user of orphans) {
+    await admin.auth.admin.deleteUser(user.id);
+  }
+  return orphans.length;
+}
+
 /** Every table that holds user-owned data. The isolation suite walks all of
  *  them, so a table added without a policy fails the build rather than leaking
  *  quietly. */

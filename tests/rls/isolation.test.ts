@@ -5,7 +5,9 @@ import {
   anonClient,
   createTestUser,
   deleteTestUser,
+  isTestAccount,
   rlsConfigured,
+  sweepOrphanedTestUsers,
   type TestUser,
 } from './harness';
 
@@ -33,7 +35,17 @@ suite('Row Level Security', () => {
 
   afterAll(async () => {
     await Promise.all([alice && deleteTestUser(alice), bob && deleteTestUser(bob)]);
+    // Catches anything an interrupted run left behind.
+    await sweepOrphanedTestUsers();
   }, 60_000);
+
+  it('only ever considers @example.test addresses deletable', () => {
+    // This project holds real accounts, so the cleanup guard is itself tested.
+    expect(isTestAccount('rls-alice-123@example.test')).toBe(true);
+    expect(isTestAccount('someone@gmail.com')).toBe(false);
+    expect(isTestAccount('attacker@example.test.evil.com')).toBe(false);
+    expect(isTestAccount(undefined)).toBe(false);
+  });
 
   // --- bootstrap ----------------------------------------------------------
 
