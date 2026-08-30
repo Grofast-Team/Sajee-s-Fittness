@@ -2,15 +2,17 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 /**
- * Refreshes the Supabase auth session on every request and gates the app
- * routes.
+ * Request proxy: refreshes the Supabase auth session and gates the app routes.
+ *
+ * Named `proxy` rather than `middleware` — Next.js 16 renamed the convention
+ * and warns on the old one.
  *
  * `getUser()` is used rather than `getSession()` deliberately: `getSession()`
  * reads the cookie without verifying it, so it can be spoofed. `getUser()`
  * validates the token against the auth server, which is the difference between
  * a real check and a decorative one.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 

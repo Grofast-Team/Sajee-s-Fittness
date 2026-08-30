@@ -1,8 +1,9 @@
 import { Barcode, Mic, Zap } from 'lucide-react';
-import { Card, CardTitle, ConfidenceBadge, Meter, Unavailable } from '@/components/ui';
+import { Card, CardTitle, Meter, Unavailable } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { ScalePhotoLogger } from '@/components/scale-photo';
 import { FoodSearch } from '@/components/food-search';
+import { LoggedMeals } from '@/components/logged-meals';
 import { getDayView } from '@/lib/data/day';
 import { aiConfigured, supabaseConfigured } from '@/lib/config';
 
@@ -79,40 +80,8 @@ export default async function FoodPage() {
         </ul>
       </Card>
 
-      <Card>
-        <CardTitle hint="Today">Logged</CardTitle>
-        {day.items.length > 0 ? (
-          <ul className="divide-y">
-            {day.items.map((entry) => (
-              <li key={entry.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{entry.meal}</p>
-                  <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-                    {entry.description}
-                  </p>
-                  <div className="mt-1">
-                    <ConfidenceBadge level={entry.confidence} />
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="tabular text-sm font-semibold">
-                    {entry.kcalLow !== null && entry.kcalHigh !== null
-                      ? `${entry.kcalLow}–${entry.kcalHigh} kcal`
-                      : `${entry.kcal} kcal`}
-                  </p>
-                  <p className="tabular text-xs" style={{ color: 'var(--fg-subtle)' }}>
-                    {entry.proteinG} g protein
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-            Nothing logged yet today.
-          </p>
-        )}
-      </Card>
+      <LoggedMeals items={day.items} canEdit={!day.isSample} />
+
     </div>
   );
 }
