@@ -12,7 +12,7 @@
  *   SUPABASE_ACCESS_TOKEN=sbp_...           \
  *   SUPABASE_PROJECT_REF=abc123             \
  *   SMTP_HOST=smtp.gmail.com                \
- *   SMTP_PORT=465                           \
+ *   SMTP_PORT=587                           \
  *   SMTP_USER=you@gmail.com                 \
  *   SMTP_PASS="abcd efgh ijkl mnop"         \
  *   SMTP_SENDER_EMAIL=you@gmail.com         \
@@ -26,6 +26,9 @@
  *   - SMTP_SENDER_EMAIL must equal SMTP_USER. Gmail rewrites the From header to
  *     the authenticated account, so a different address is silently replaced.
  *     The display name is still yours: mail arrives as "FitCoach <you@gmail.com>".
+ *   - Use port 587 (STARTTLS), not 465. Supabase's mailer fails against Gmail's
+ *     implicit-SSL port and surfaces only a generic "Error sending recovery
+ *     email" 500, with nothing in the response to say the port was the cause.
  *   - Roughly 500 recipients/day personal, 2,000/day Workspace.
  *
  * For any other provider the sender address must be on a domain you have
@@ -73,6 +76,17 @@ const password = SMTP_PASS.replace(/\s+/g, '');
 // because everything looks fine until a user reports they got no email.
 // ---------------------------------------------------------------------------
 if (/gmail\.com|googlemail\.com/i.test(SMTP_HOST)) {
+  if (String(SMTP_PORT) === '465') {
+    console.error(
+      [
+        'Gmail on port 465 does not work with Supabase.',
+        'The config is accepted, then every send fails with a generic 500.',
+        'Use SMTP_PORT=587 instead.',
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+
   if (SMTP_SENDER_EMAIL.toLowerCase() !== SMTP_USER.toLowerCase()) {
     console.error(
       [
