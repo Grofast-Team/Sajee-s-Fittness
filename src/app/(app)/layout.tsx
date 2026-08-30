@@ -1,8 +1,17 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { BottomNav } from '@/components/bottom-nav';
+import { needsOnboarding } from '@/lib/data/onboarding-state';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // A signed-in user with no plan has not finished setup. Showing them the
+  // sample profile — someone else's numbers behind a warning banner — is worse
+  // than useless: it looks like the app is broken. Send them to finish instead.
+  if (await needsOnboarding()) {
+    redirect('/onboarding');
+  }
+
   return (
     <div className="mx-auto min-h-dvh max-w-lg">
       {/* Settings deliberately lives here rather than in the bottom bar: five
