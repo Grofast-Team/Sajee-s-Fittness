@@ -39,7 +39,7 @@ authorisation decision is made, it must be `getUser()`.
 | Child tables inherit ownership through their parent | Done — `grocery_items`, `recipe_ingredients` |
 | Users cannot publish custom foods or recipes to other users | Done — `is_public = false` forced in `with check` |
 | **Admins are not granted blanket read access to user health data** | Done — deliberate omission |
-| Automated cross-user access tests in CI | Required before launch |
+| Automated cross-user access tests | **Done** — `npm run test:rls`, 17 tests |
 
 Admin policies exist for content tables (foods, recipes, exercises, lessons) but
 deliberately **not** for user data. Support workflows should go through audited,
@@ -105,22 +105,47 @@ build failure.
 | Cycle tracking strictly opt-in | Done — separate table, never inferred |
 | Product analytics separated from health records | Required before launch |
 | Data export | Required before launch |
-| Account deletion cascades all user rows | Done — `on delete cascade` throughout |
+| Account deletion cascades all user rows | **Done** — verified live; see the rollup-guard fix below |
 
-## Tests to write before launch
+## The RLS test suite
 
-```
-tests/rls/
-  own-rows.test.ts          user reads and writes their own rows
-  cross-user.test.ts        user B cannot read user A's rows — every table
-  anonymous.test.ts         anon reaches no user data
-  storage.test.ts           user B cannot read user A's meal photos
-  admin-scope.test.ts       admin can edit foods, cannot read health data
-  custom-food.test.ts       a user cannot set is_public or is_verified
-```
+`npm run test:rls` — 17 tests against a real Supabase project, in
+`tests/rls/isolation.test.ts`. Not part of `npm test`, which stays fast, offline
+and deterministic.
 
-These require a running Supabase instance and so are not in the default `npm
-test` run, which covers the pure engines only.
+RLS cannot be meaningfully tested any other way: the policies live in the
+database, not in application code, so a mock would only test the mock.
+
+| Covered | |
+| --- | --- |
+| New-user bootstrap creates profile rows | ✅ |
+| Anonymous reaches **no** user-owned table (all 30 walked) | ✅ |
+| Anonymous cannot read the food database either | ✅ |
+| Anonymous cannot insert on someone's behalf | ✅ |
+| User B reads nothing of User A's — every owner table walked | ✅ |
+| Free-text health fields do not leak across users | ✅ |
+| Insert carrying another user's `user_id` is refused with `42501` | ✅ |
+| Update against another user's row affects nothing | ✅ |
+| Delete against another user's rows affects nothing | ✅ |
+| A user cannot publish or verify a custom food | ✅ |
+| A user's private custom food is invisible to others | ✅ |
+| Ordinary users cannot edit reference data | ✅ |
+| Account deletion removes every trace | ✅ |
+
+**The control test matters most.** Every isolation assertion is of the form
+"B sees nothing", which would pass just as happily against an empty table or a
+typo'd table name. One test therefore uses the service-role client to prove the
+withheld rows genuinely exist and are genuinely being withheld. Without it the
+suite would be decorative.
+
+The suite walks `OWNER_TABLES`, so a new user-owned table added without a policy
+fails the tests rather than leaking quietly.
+
+### Still to write
+
+- Storage isolation: user B cannot read user A's meal photos (needs a photo
+  upload path first)
+- Admin scope: an admin can edit foods but cannot read health data
 
 ## Ongoing
 
