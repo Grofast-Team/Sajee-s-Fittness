@@ -11,8 +11,8 @@ export default function NotFound() {
       </p>
       <Link
         href="/today"
-        className="mt-6 flex min-h-11 max-w-48 items-center justify-center rounded-xl text-sm font-semibold"
-        style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
+        className="mt-6 flex min-h-11 max-w-48 items-center justify-center rounded-md text-sm font-semibold"
+        style={{ background: 'var(--fg)', color: 'var(--bg)' }}
       >
         Go to today
       </Link>

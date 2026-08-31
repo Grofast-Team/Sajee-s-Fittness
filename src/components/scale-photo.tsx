@@ -101,7 +101,7 @@ export function ScalePhotoLogger() {
             <li key={tip} className="flex gap-2.5 text-sm">
               <span
                 className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                style={{ background: 'var(--surface-2)', color: 'var(--primary)' }}
+                style={{ background: 'var(--ground)', color: 'var(--fg)' }}
               >
                 {i + 1}
               </span>
@@ -150,7 +150,7 @@ export function ScalePhotoLogger() {
           <img
             src={preview}
             alt="The meal you photographed"
-            className="w-full rounded-xl object-cover"
+            className="w-full rounded-md object-cover"
             style={{ maxHeight: 280 }}
           />
         </Card>
@@ -159,7 +159,7 @@ export function ScalePhotoLogger() {
       {status === 'error' && error ? (
         <Card className="border-dashed">
           <div className="flex gap-2.5">
-            <CircleAlert size={18} className="mt-0.5 shrink-0" style={{ color: '#b45309' }} aria-hidden />
+            <CircleAlert size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--signal)' }} aria-hidden />
             <div>
               <p className="text-sm font-medium">Analysis unavailable</p>
               <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
@@ -187,10 +187,10 @@ function AnalysisResult({ result }: { result: AnalysisResponse }) {
         <CardTitle hint={scaleUsed ? 'Weighed' : 'Estimated'}>What we found</CardTitle>
 
         <div
-          className="mb-3 flex items-start gap-2.5 rounded-xl p-3 text-sm"
-          style={{ background: 'var(--surface-2)' }}
+          className="mb-3 flex items-start gap-2.5 rounded-md p-3 text-sm"
+          style={{ background: 'var(--ground)' }}
         >
-          <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} aria-hidden />
+          <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--fg)' }} aria-hidden />
           <p>
             {scaleUsed
               ? `We read ${result.scale.value}${result.scale.unit} from your scale, so these numbers are based on a measured weight rather than a guess.`
@@ -218,7 +218,7 @@ function AnalysisResult({ result }: { result: AnalysisResponse }) {
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="tabular text-sm font-semibold">
+                  <p className="data text-sm font-semibold">
                     {item.nutrition ? item.nutrition.display : '—'}
                   </p>
                   <div className="mt-1">
@@ -228,7 +228,7 @@ function AnalysisResult({ result }: { result: AnalysisResponse }) {
               </div>
 
               {item.needsFoodMatch ? (
-                <p className="mt-2 text-sm" style={{ color: '#b45309' }}>
+                <p className="mt-2 text-sm" style={{ color: 'var(--signal)' }}>
                   We do not have &ldquo;{item.name}&rdquo; in the food database yet, so it is not
                   counted in your total. Search for it or add it as a custom food.
                 </p>

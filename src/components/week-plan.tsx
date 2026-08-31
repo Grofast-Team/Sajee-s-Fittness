@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Check, CircleAlert, Loader2 } from 'lucide-react';
-import { Button, Card, CardTitle } from '@/components/ui';
+import { Button, Section } from '@/components/ui';
 import { updateSession } from '@/lib/actions/training';
 import { recoveryPlan } from '@/lib/engines/adherence';
 import type { WeekSession, WeekView } from '@/lib/data/week';
@@ -35,15 +35,14 @@ export function WeekPlan({ week, canSave }: { week: WeekView; canSave: boolean }
 
   return (
     <>
-      <Card>
-        <CardTitle hint={`${week.completedCount} of ${week.plannedCount} done`}>This week</CardTitle>
+      <Section title="This week" meta={`${week.completedCount} of ${week.plannedCount} done`}>
 
         <ul className="space-y-1.5">
           {week.sessions.map((s) => (
             <li key={s.date || s.dayName} className="flex items-center gap-3 text-sm">
               <span
                 className="w-9 shrink-0 font-medium"
-                style={{ color: s.isToday ? 'var(--primary)' : 'var(--fg-subtle)' }}
+                style={{ color: s.isToday ? 'var(--fg)' : 'var(--fg-subtle)' }}
               >
                 {s.dayName}
               </span>
@@ -54,32 +53,31 @@ export function WeekPlan({ week, canSave }: { week: WeekView; canSave: boolean }
         </ul>
 
         {error ? (
-          <p role="alert" className="mt-3 flex items-start gap-2 text-sm" style={{ color: '#b91c1c' }}>
+          <p role="alert" className="mt-3 flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
             <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
             {error}
           </p>
         ) : null}
-      </Card>
+      </Section>
 
       {/* Missed sessions come before today's, because unresolved guilt about
           yesterday is what stops people starting today. */}
       {missed ? (
-        <Card>
-          <CardTitle>You missed {missed.dayName}</CardTitle>
+        <Section title="You missed {missed.dayName}">
           <MissedPanel
             session={missed}
             canSave={canSave}
             busy={pending && busyId === missed.id}
             onAction={(input) => missed.id && run(missed.id, input)}
           />
-        </Card>
+        </Section>
       ) : null}
 
       {today && today.kind !== 'rest' && today.status === 'planned' ? (
-        <Card>
-          <CardTitle hint={today.plannedMinutes ? `${today.plannedMinutes} min` : undefined}>
-            Today: {today.label}
-          </CardTitle>
+        <Section
+          title={`Today: ${today.label}`}
+          meta={today.plannedMinutes ? `${today.plannedMinutes} min` : undefined}
+        >
 
           <div className="flex flex-wrap gap-2">
             <Button
@@ -120,15 +118,14 @@ export function WeekPlan({ week, canSave }: { week: WeekView; canSave: boolean }
               Sign in and finish setup to track your sessions.
             </p>
           ) : null}
-        </Card>
+        </Section>
       ) : today?.kind === 'rest' ? (
-        <Card>
-          <CardTitle>Today: rest</CardTitle>
+        <Section title="Today: rest">
           <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
             Rest is part of the plan, not a gap in it. Your muscles adapt during recovery, not
             during the session. A gentle walk is fine if you want one.
           </p>
-        </Card>
+        </Section>
       ) : null}
     </>
   );
@@ -139,20 +136,20 @@ function StatusChip({ session }: { session: WeekSession }) {
 
   const config =
     status === 'completed'
-      ? { text: 'Done', bg: 'rgb(5 150 105 / 0.12)', fg: 'var(--accent)' }
+      ? { text: 'Done', bg: 'var(--confirm-wash)', fg: 'var(--confirm)' }
       : status === 'partial'
-        ? { text: 'Partial', bg: 'rgb(5 150 105 / 0.10)', fg: 'var(--accent)' }
+        ? { text: 'Partial', bg: 'var(--confirm-wash)', fg: 'var(--confirm)' }
         : status === 'skipped'
-          ? { text: 'Skipped', bg: 'var(--surface-2)', fg: 'var(--fg-subtle)' }
+          ? { text: 'Skipped', bg: 'var(--ground)', fg: 'var(--fg-subtle)' }
           : status === 'moved'
-            ? { text: 'Moved', bg: 'var(--surface-2)', fg: 'var(--fg-subtle)' }
+            ? { text: 'Moved', bg: 'var(--ground)', fg: 'var(--fg-subtle)' }
             : status === 'rest' || kind === 'rest'
-              ? { text: 'Rest', bg: 'var(--surface-2)', fg: 'var(--fg-subtle)' }
+              ? { text: 'Rest', bg: 'var(--ground)', fg: 'var(--fg-subtle)' }
               : isToday
-                ? { text: 'Today', bg: 'rgb(8 145 178 / 0.14)', fg: 'var(--primary)' }
+                ? { text: 'Today', bg: 'var(--signal-wash)', fg: 'var(--fg)' }
                 : session.isPast
-                  ? { text: 'Missed', bg: 'rgb(245 158 11 / 0.14)', fg: '#b45309' }
-                  : { text: 'Planned', bg: 'var(--surface-2)', fg: 'var(--fg-subtle)' };
+                  ? { text: 'Missed', bg: 'var(--signal-wash)', fg: 'var(--signal)' }
+                  : { text: 'Planned', bg: 'var(--ground)', fg: 'var(--fg-subtle)' };
 
   return (
     <span

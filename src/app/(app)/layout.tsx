@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link
           href="/settings"
           aria-label="Settings"
-          className="flex size-11 items-center justify-center rounded-xl transition-colors duration-200"
+          className="flex size-11 items-center justify-center rounded-md transition-colors duration-200"
           style={{ color: 'var(--fg-subtle)' }}
         >
           <Settings size={20} aria-hidden />

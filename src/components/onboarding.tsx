@@ -68,7 +68,7 @@ export function Onboarding() {
               type="button"
               onClick={() => setIndex((i) => i - 1)}
               className="inline-flex cursor-pointer items-center gap-1 font-medium"
-              style={{ color: 'var(--primary)' }}
+              style={{ color: 'var(--fg)' }}
             >
               <ArrowLeft size={15} aria-hidden /> Back
             </button>
@@ -76,7 +76,7 @@ export function Onboarding() {
         </div>
         <div
           className="h-1.5 w-full overflow-hidden rounded-full"
-          style={{ background: 'var(--surface-2)' }}
+          style={{ background: 'var(--ground)' }}
           role="progressbar"
           aria-valuenow={index + 1}
           aria-valuemin={1}
@@ -85,7 +85,7 @@ export function Onboarding() {
         >
           <div
             className="h-full rounded-full transition-[width] duration-300"
-            style={{ width: `${((index + 1) / STEPS.length) * 100}%`, background: 'var(--primary)' }}
+            style={{ width: `${((index + 1) / STEPS.length) * 100}%`, background: 'var(--fg)' }}
           />
         </div>
       </div>
@@ -147,9 +147,9 @@ function FieldInput({
   onChange: (v: unknown) => void;
 }) {
   const inputStyle = {
-    background: 'var(--surface-2)',
+    background: 'var(--ground)',
     color: 'var(--fg)',
-    borderColor: 'var(--border)',
+    borderColor: 'var(--line)',
   };
 
   return (
@@ -176,11 +176,11 @@ function FieldInput({
                   type="button"
                   onClick={() => onChange(o.value)}
                   aria-pressed={selected}
-                  className="min-h-11 cursor-pointer rounded-xl border px-3 text-sm font-medium transition-colors duration-200"
+                  className="min-h-11 cursor-pointer rounded-md border px-3 text-sm font-medium transition-colors duration-200"
                   style={{
-                    background: selected ? 'var(--primary)' : 'var(--surface-2)',
-                    color: selected ? 'var(--primary-fg)' : 'var(--fg)',
-                    borderColor: selected ? 'var(--primary)' : 'var(--border)',
+                    background: selected ? 'var(--fg)' : 'var(--ground)',
+                    color: selected ? 'var(--bg)' : 'var(--fg)',
+                    borderColor: selected ? 'var(--fg)' : 'var(--line)',
                   }}
                 >
                   {o.label}
@@ -204,11 +204,11 @@ function FieldInput({
                   onClick={() =>
                     onChange(selected ? list.filter((v) => v !== o.value) : [...list, o.value])
                   }
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors duration-200"
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors duration-200"
                   style={{
-                    background: selected ? 'var(--primary)' : 'var(--surface-2)',
-                    color: selected ? 'var(--primary-fg)' : 'var(--fg)',
-                    borderColor: selected ? 'var(--primary)' : 'var(--border)',
+                    background: selected ? 'var(--fg)' : 'var(--ground)',
+                    color: selected ? 'var(--bg)' : 'var(--fg)',
+                    borderColor: selected ? 'var(--fg)' : 'var(--line)',
                   }}
                 >
                   {selected ? <Check size={14} aria-hidden /> : null}
@@ -225,11 +225,11 @@ function FieldInput({
                 type="button"
                 aria-pressed={value === n}
                 onClick={() => onChange(n)}
-                className="min-h-11 flex-1 cursor-pointer rounded-xl border text-sm font-semibold transition-colors duration-200"
+                className="min-h-11 flex-1 cursor-pointer rounded-md border text-sm font-semibold transition-colors duration-200"
                 style={{
-                  background: value === n ? 'var(--primary)' : 'var(--surface-2)',
-                  color: value === n ? 'var(--primary-fg)' : 'var(--fg)',
-                  borderColor: value === n ? 'var(--primary)' : 'var(--border)',
+                  background: value === n ? 'var(--fg)' : 'var(--ground)',
+                  color: value === n ? 'var(--bg)' : 'var(--fg)',
+                  borderColor: value === n ? 'var(--fg)' : 'var(--line)',
                 }}
               >
                 {n}
@@ -249,7 +249,7 @@ function FieldInput({
               onChange={(e) =>
                 onChange(field.type === 'number' ? Number(e.target.value) || undefined : e.target.value)
               }
-              className="min-h-11 w-full rounded-xl border px-3 text-base"
+              className="min-h-11 w-full rounded-md border px-3 text-base"
               style={inputStyle}
             />
             {field.unit ? (
@@ -364,7 +364,7 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
       {referrals.map((flag) => (
         <Card key={flag.code} className="border-dashed">
           <div className="flex gap-2.5">
-            <CircleAlert size={18} className="mt-0.5 shrink-0" style={{ color: '#b45309' }} aria-hidden />
+            <CircleAlert size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--signal)' }} aria-hidden />
             <div>
               <p className="text-sm font-semibold">{flag.reason}</p>
               <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
@@ -391,7 +391,7 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
               <dt className="text-sm" style={{ color: 'var(--fg-muted)' }}>
                 {k}
               </dt>
-              <dd className="tabular text-base font-semibold">{v}</dd>
+              <dd className="data text-base font-semibold">{v}</dd>
             </div>
           ))}
         </dl>
@@ -426,10 +426,10 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
       </Card>
 
       <div
-        className="flex items-start gap-2.5 rounded-xl p-3 text-sm"
-        style={{ background: 'var(--surface-2)' }}
+        className="flex items-start gap-2.5 rounded-md p-3 text-sm"
+        style={{ background: 'var(--ground)' }}
       >
-        <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} aria-hidden />
+        <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--fg)' }} aria-hidden />
         <p>
           This is general wellness guidance, not medical advice, and it is not a substitute for a
           doctor or a registered dietitian.
@@ -437,7 +437,7 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
       </div>
 
       {saveError ? (
-        <p role="alert" className="flex items-start gap-2 text-sm" style={{ color: '#b91c1c' }}>
+        <p role="alert" className="flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
           <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
           {saveError}
         </p>

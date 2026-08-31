@@ -1,4 +1,4 @@
-import { Card, CardTitle, Unavailable } from '@/components/ui';
+import { Section, Unavailable } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { getDayView } from '@/lib/data/day';
 import { aiConfigured } from '@/lib/config';
@@ -43,8 +43,7 @@ export default async function CoachPage() {
 
       {/* What the coach is given is shown to the user. Nothing is retrieved
           about them that they cannot see. */}
-      <Card>
-        <CardTitle hint="Visible to the coach">What it knows right now</CardTitle>
+      <Section title="What it knows right now" meta="Visible to the coach">
         <dl className="space-y-1.5 text-sm">
           {[
             ['Remaining today', `${remaining.kcalRemaining.toLocaleString()} kcal · ${Math.round(remaining.proteinRemaining)} g protein`],
@@ -71,24 +70,23 @@ export default async function CoachPage() {
         <p className="mt-3 text-xs" style={{ color: 'var(--fg-subtle)' }}>
           You can view and delete anything the coach remembers about you in Settings.
         </p>
-      </Card>
+      </Section>
 
       {aiConfigured ? (
-        <Card>
-          <CardTitle>Ask</CardTitle>
+        <Section title="Ask">
           <div className="flex flex-wrap gap-2">
             {PROMPTS.map((p) => (
               <button
                 key={p}
                 type="button"
                 className="min-h-11 cursor-pointer rounded-full px-3 text-sm font-medium transition-colors duration-200"
-                style={{ background: 'var(--surface-2)' }}
+                style={{ background: 'var(--ground)' }}
               >
                 {p}
               </button>
             ))}
           </div>
-        </Card>
+        </Section>
       ) : (
         <Unavailable
           title="The chat coach is not configured"
@@ -99,9 +97,7 @@ export default async function CoachPage() {
           }
         />
       )}
-
-      <Card>
-        <CardTitle>Answers that do not need AI</CardTitle>
+      <Section title="Answers that do not need AI">
         <p className="mb-3 text-sm" style={{ color: 'var(--fg-muted)' }}>
           These come straight from the calculation engines, so they work even when every model is
           offline.
@@ -126,10 +122,8 @@ export default async function CoachPage() {
             </p>
           </li>
         </ul>
-      </Card>
-
-      <Card>
-        <CardTitle>What this app will not do</CardTitle>
+      </Section>
+      <Section title="What this app will not do">
         <ul className="space-y-1.5 text-sm" style={{ color: 'var(--fg-muted)' }}>
           {[
             `Set you a starvation target. Your floor is ${day.floorKcal.toLocaleString()} kcal and nothing can push it lower.`,
@@ -144,7 +138,7 @@ export default async function CoachPage() {
             </li>
           ))}
         </ul>
-      </Card>
+      </Section>
     </div>
   );
 }

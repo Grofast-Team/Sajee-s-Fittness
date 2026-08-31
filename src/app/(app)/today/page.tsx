@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Card, CardTitle, ConfidenceBadge, Meter, WhyPanel } from '@/components/ui';
+import { ArrowRight } from 'lucide-react';
+import { ConfidenceTag, Rail, Section, Why } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { SleepEntry, WaterEntry } from '@/components/quick-entry';
 import { getDayView } from '@/lib/data/day';
@@ -10,9 +11,11 @@ export const metadata = { title: 'Today — FitCoach' };
 /**
  * The home screen.
  *
- * It has one job: answer "what do I need to do today?" within about five
- * seconds. So the order is priorities first, numbers second, and everything
- * else is collapsed behind a "Why?" until asked for.
+ * One job: answer "what do I do today?" in about five seconds.
+ *
+ * So it opens with the single number that decides the rest of the day — what is
+ * left to eat — at a size nothing competes with. Everything after that is
+ * quieter, and the reasoning is folded away behind "Why?" until asked for.
  */
 export default async function TodayPage() {
   const day = await getDayView();
@@ -20,195 +23,204 @@ export default async function TodayPage() {
   const stepsShort =
     day.stepsToday === null ? null : Math.max(0, day.stepTarget - day.stepsToday);
 
-  const priorities = [
+  const remaining = day.remaining.kcalRemaining;
+  const over = remaining < 0;
+
+  const brief = [
     day.remaining.proteinRemaining > 0
-      ? `Get another ${Math.round(day.remaining.proteinRemaining)} g of protein — dinner is the easy place for it.`
-      : 'Protein target already met. Nice.',
+      ? `${Math.round(day.remaining.proteinRemaining)} g more protein. Dinner is the easy place for it.`
+      : 'Protein target met.',
     stepsShort === null
-      ? `Record your steps — your target today is ${day.stepTarget.toLocaleString()}.`
+      ? `Record your steps. Target is ${day.stepTarget.toLocaleString()}.`
       : stepsShort > 0
-        ? `Walk ${stepsShort.toLocaleString()} more steps — about ${stepsToMinutes(stepsShort)} minutes.`
-        : 'Step goal already met today.',
-    'Do your strength session, or move it to tomorrow if today is gone.',
+        ? `${stepsShort.toLocaleString()} more steps — about ${stepsToMinutes(stepsShort)} minutes of walking.`
+        : 'Step goal met.',
+    'Your strength session, or move it to tomorrow if today has gone.',
     'Wind down in time to hit your sleep target.',
   ];
 
   return (
-    <div className="space-y-4">
+    <>
       <SampleBanner isSample={day.isSample} />
 
-      <header>
-        {day.displayName ? (
-          <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-            Hello, {day.displayName}
-          </p>
-        ) : null}
-        <h1 className="text-2xl font-semibold">Today</h1>
-      </header>
+      {/* Hero. Full bleed, no card — the number the screen exists for. */}
+      <header className="pb-7 pt-6">
+        {day.displayName ? <p className="eyebrow mb-5">{day.displayName}&rsquo;s day</p> : null}
 
-      {/* Priorities come before the dashboard. A beginner opening the app needs
-          instructions, not telemetry. */}
-      <Card>
-        <CardTitle>What matters today</CardTitle>
-        <ol className="space-y-2.5">
-          {priorities.map((p, i) => (
-            <li key={p} className="flex gap-3 text-sm">
-              <span
-                className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                style={{ background: 'var(--surface-2)', color: 'var(--primary)' }}
-              >
-                {i + 1}
+        <div className="flex items-end gap-3">
+          <span
+            className="data leading-none"
+            style={{
+              fontSize: 'clamp(3.6rem, 19vw, 5.5rem)',
+              fontWeight: 500,
+              color: over ? 'var(--signal)' : 'var(--fg)',
+            }}
+          >
+            {Math.abs(remaining).toLocaleString()}
+          </span>
+          <span className="pb-2">
+            <span className="eyebrow block">kcal</span>
+            <span className="block text-sm" style={{ color: 'var(--fg-muted)' }}>
+              {over ? 'over' : 'left'}
+            </span>
+          </span>
+        </div>
+
+        <p className="mt-4 max-w-md text-sm leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
+          {day.remaining.message}
+        </p>
+      </header>
+      {/* Numbering is justified here: this is a genuine priority order, not
+          decoration. Item one matters more than item four. */}
+      <Section title="Today's brief">
+        <ol>
+          {brief.map((item, i) => (
+            <li key={item} className="flex gap-4 border-b py-3 last:border-0">
+              <span className="data pt-0.5 text-xs" style={{ color: 'var(--fg-subtle)' }}>
+                {String(i + 1).padStart(2, '0')}
               </span>
-              <span>{p}</span>
+              <span className="text-sm leading-relaxed">{item}</span>
             </li>
           ))}
         </ol>
-      </Card>
-
-      <Card>
-        <CardTitle hint={`${day.targetKcal.toLocaleString()} kcal target`}>Nutrition</CardTitle>
-        <div className="space-y-3.5">
-          <Meter
+      </Section>
+      <Section title="Intake" meta={`${day.targetKcal.toLocaleString()} kcal target`}>
+        <div className="space-y-5">
+          <Rail
             label="Energy"
             value={day.consumedKcal}
             target={day.targetKcal}
             unit="kcal"
-            note={day.remaining.message}
+            size="lg"
           />
-          <Meter
+          <Rail
             label="Protein"
             value={day.consumedProteinG}
             target={day.proteinTargetG}
             unit="g"
-            tone="grow"
           />
         </div>
 
         {day.rationale.energy ? (
-          <WhyPanel label="Why this calorie target?">
+          <Why label="Why this target">
             <p>{day.rationale.energy}</p>
-            <p className="mt-2">
-              We estimated your resting energy at about {day.rationale.bmrKcal.toLocaleString()} kcal
-              (realistically somewhere between {day.rationale.bmrLowKcal.toLocaleString()} and{' '}
-              {day.rationale.bmrHighKcal.toLocaleString()}), then adjusted for your activity:
+            <p className="mt-3">
+              Resting energy is estimated at{' '}
+              <span className="data">{day.rationale.bmrKcal.toLocaleString()}</span> kcal —
+              realistically between <span className="data">{day.rationale.bmrLowKcal.toLocaleString()}</span>{' '}
+              and <span className="data">{day.rationale.bmrHighKcal.toLocaleString()}</span>. Then
+              adjusted for how you actually spend your day:
             </p>
-            <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+            <ul className="mt-2 space-y-1">
               {day.rationale.activityReasons.map((r) => (
-                <li key={r}>{r}</li>
+                <li key={r} className="flex gap-2">
+                  <span aria-hidden style={{ color: 'var(--fg-subtle)' }}>
+                    —
+                  </span>
+                  <span>{r}</span>
+                </li>
               ))}
             </ul>
-            <p className="mt-2">
-              That is a prediction, not a measurement. We will correct it from what your weight
-              actually does over the next few weeks.
+            <p className="mt-3">
+              That is a prediction, not a measurement. We correct it from what your weight actually
+              does over the coming weeks.
             </p>
-          </WhyPanel>
+          </Why>
         ) : null}
-      </Card>
-
-      <Card>
-        <CardTitle>Movement</CardTitle>
-        <div className="space-y-3.5">
-          {day.stepsToday === null ? (
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">Steps</span>
-              {/* Never invent a step count. Missing means missing. */}
-              <span style={{ color: 'var(--fg-muted)' }}>
-                Not recorded · target {day.stepTarget.toLocaleString()}
-              </span>
-            </div>
-          ) : (
-            <Meter label="Steps" value={day.stepsToday} target={day.stepTarget} unit="steps" />
-          )}
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">Strength session</span>
-            <span style={{ color: 'var(--fg-muted)' }}>not done yet</span>
+      </Section>
+      <Section title="Movement">
+        {day.stepsToday === null ? (
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-sm">Steps</span>
+            {/* Never invent a step count. Missing stays missing. */}
+            <span className="text-sm" style={{ color: 'var(--fg-subtle)' }}>
+              not recorded · target{' '}
+              <span className="data">{day.stepTarget.toLocaleString()}</span>
+            </span>
           </div>
-        </div>
-        {day.rationale.steps ? (
-          <WhyPanel label="Why this step goal?">{day.rationale.steps}</WhyPanel>
-        ) : null}
-      </Card>
+        ) : (
+          <Rail label="Steps" value={day.stepsToday} target={day.stepTarget} unit="steps" />
+        )}
 
-      <Card>
-        <CardTitle hint={day.items.length > 0 ? `${day.items.length} logged` : undefined}>
-          Meals so far
-        </CardTitle>
-
+        {day.rationale.steps ? <Why label="Why this number">{day.rationale.steps}</Why> : null}
+      </Section>
+      <Section title="Meals" meta={day.items.length > 0 ? `${day.items.length} logged` : undefined}>
         {day.items.length > 0 ? (
-          <ul className="divide-y">
+          <ul>
             {day.items.map((entry) => (
-              <li key={entry.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0">
+              <li key={entry.id} className="flex items-start justify-between gap-4 border-b py-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">{entry.meal}</p>
-                  <p className="truncate text-sm" style={{ color: 'var(--fg-muted)' }}>
-                    {entry.description}
+                  <p className="text-sm">{entry.description}</p>
+                  <p className="eyebrow mt-1">{entry.meal}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="data text-sm">
+                    {/* A range stays a range. */}
+                    {entry.kcalLow !== null && entry.kcalHigh !== null
+                      ? `${entry.kcalLow}–${entry.kcalHigh}`
+                      : entry.kcal}
                   </p>
                   <div className="mt-1">
-                    <ConfidenceBadge level={entry.confidence} />
+                    <ConfidenceTag level={entry.confidence} />
                   </div>
                 </div>
-                <p className="tabular shrink-0 text-sm font-semibold">
-                  {/* An entry saved as a range is shown as a range. */}
-                  {entry.kcalLow !== null && entry.kcalHigh !== null
-                    ? `${entry.kcalLow}–${entry.kcalHigh} kcal`
-                    : `${entry.kcal} kcal`}
-                </p>
               </li>
             ))}
           </ul>
         ) : (
           <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-            Nothing logged yet today. Start with whatever you ate last — it does not have to be
-            perfect.
+            Nothing logged yet. Start with whatever you ate last — a rough entry beats no entry.
           </p>
         )}
 
         <Link
           href="/food"
-          className="mt-3 flex min-h-11 items-center justify-center rounded-xl text-sm font-semibold"
-          style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
+          className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-md px-4 text-sm font-medium"
+          style={{ background: 'var(--fg)', color: 'var(--bg)' }}
         >
-          Log a meal
+          Log a meal <ArrowRight size={15} aria-hidden />
         </Link>
-      </Card>
-
-      <WaterEntry canSave={!day.isSample} consumedMl={day.waterToday} targetMl={day.waterMl} />
-
-      <SleepEntry
-        canSave={!day.isSample}
-        currentMinutes={day.sleepMinutes}
-        targetHours={day.sleepTargetHours}
-      />
-
-      <Card>
-        <CardTitle>Weight</CardTitle>
+      </Section>
+      <Section title="Weight">
         {day.trend.latestSmoothed !== null ? (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="tabular text-3xl font-semibold">
+            <div className="flex items-end gap-2.5">
+              <span className="data text-4xl" style={{ fontWeight: 500 }}>
                 {day.trend.latestSmoothed.toFixed(1)}
               </span>
-              <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-                kg trend
-              </span>
+              <span className="eyebrow pb-1.5">kg trend</span>
             </div>
-            <p className="mt-1.5 text-sm" style={{ color: 'var(--fg-muted)' }}>
+            <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
               {day.trend.message}
             </p>
-            <WhyPanel label="Why is this different from the scale this morning?">
+            <Why label="Why this differs from the scale">
               Your most recent reading was{' '}
-              {day.trend.points[day.trend.points.length - 1]?.raw.toFixed(1)} kg. The number above
-              is a smoothed trend across all {day.trend.readingCount} of your weigh-ins. Day-to-day
-              readings move mostly with water, salt and food still in your system, so the trend is
-              a far better description of what your body is actually doing.
-            </WhyPanel>
+              <span className="data">
+                {day.trend.points[day.trend.points.length - 1]?.raw.toFixed(1)}
+              </span>{' '}
+              kg. The figure above is smoothed across all{' '}
+              <span className="data">{day.trend.readingCount}</span> of your weigh-ins. Day-to-day
+              readings move mostly with water, salt and food still in your system, so the trend
+              describes your body far better than this morning did.
+            </Why>
           </>
         ) : (
           <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
             {day.trend.message}
           </p>
         )}
-      </Card>
-    </div>
+      </Section>
+      <Section title="Hydration">
+        <WaterEntry canSave={!day.isSample} consumedMl={day.waterToday} targetMl={day.waterMl} />
+      </Section>
+
+      <Section title="Sleep">
+        <SleepEntry
+          canSave={!day.isSample}
+          currentMinutes={day.sleepMinutes}
+          targetHours={day.sleepTargetHours}
+        />
+      </Section>
+    </>
   );
 }

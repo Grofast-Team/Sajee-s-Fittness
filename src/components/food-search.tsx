@@ -94,7 +94,7 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
         <p
           role="status"
           className="mb-3 flex items-start gap-2 text-sm"
-          style={{ color: 'var(--accent)' }}
+          style={{ color: 'var(--confirm)' }}
         >
           <CircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden />
           {saved}
@@ -118,8 +118,8 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="dosai, thayir, 2 idli…"
           autoComplete="off"
-          className="min-h-11 w-full rounded-xl border pl-10 pr-10 text-base"
-          style={{ background: 'var(--surface-2)', color: 'var(--fg)', borderColor: 'var(--border)' }}
+          className="min-h-11 w-full rounded-md border pl-10 pr-10 text-base"
+          style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
         />
         {loading ? (
           <Loader2
@@ -164,7 +164,7 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
                       : ''}
                   </span>
                 </span>
-                <Plus size={18} className="shrink-0" style={{ color: 'var(--primary)' }} aria-hidden />
+                <Plus size={18} className="shrink-0" style={{ color: 'var(--fg)' }} aria-hidden />
               </button>
             </li>
           ))}
@@ -278,13 +278,13 @@ function PortionPicker({
           onClick={onCancel}
           aria-label="Cancel"
           className="cursor-pointer rounded-lg p-1.5"
-          style={{ background: 'var(--surface-2)' }}
+          style={{ background: 'var(--ground)' }}
         >
           <X size={16} aria-hidden />
         </button>
       </div>
 
-      <div className="mb-4 flex gap-1 rounded-xl p-1" style={{ background: 'var(--surface-2)' }}>
+      <div className="mb-4 flex gap-1 rounded-md p-1" style={{ background: 'var(--ground)' }}>
         <button
           type="button"
           onClick={() => setMode('grams')}
@@ -326,8 +326,8 @@ function PortionPicker({
               max={5000}
               value={grams}
               onChange={(e) => setGrams(Number(e.target.value) || 0)}
-              className="min-h-11 w-full rounded-xl border px-3 text-base"
-              style={{ background: 'var(--surface-2)', color: 'var(--fg)', borderColor: 'var(--border)' }}
+              className="min-h-11 w-full rounded-md border px-3 text-base"
+              style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
             />
             <span className="shrink-0 text-sm" style={{ color: 'var(--fg-subtle)' }}>
               g
@@ -351,15 +351,15 @@ function PortionPicker({
               step={0.25}
               value={count}
               onChange={(e) => setCount(Number(e.target.value) || 0)}
-              className="min-h-11 w-20 rounded-xl border px-3 text-base"
-              style={{ background: 'var(--surface-2)', color: 'var(--fg)', borderColor: 'var(--border)' }}
+              className="min-h-11 w-20 rounded-md border px-3 text-base"
+              style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
             />
             <select
               aria-label="Unit"
               value={servingIndex}
               onChange={(e) => setServingIndex(Number(e.target.value))}
-              className="min-h-11 flex-1 rounded-xl border px-3 text-base"
-              style={{ background: 'var(--surface-2)', color: 'var(--fg)', borderColor: 'var(--border)' }}
+              className="min-h-11 flex-1 rounded-md border px-3 text-base"
+              style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
             >
               {food.servings.map((s, i) => (
                 <option key={s.unitLabel} value={i}>
@@ -382,8 +382,8 @@ function PortionPicker({
           id="meal"
           value={meal}
           onChange={(e) => setMeal(e.target.value)}
-          className="mt-1.5 min-h-11 w-full rounded-xl border px-3 text-base"
-          style={{ background: 'var(--surface-2)', color: 'var(--fg)', borderColor: 'var(--border)' }}
+          className="mt-1.5 min-h-11 w-full rounded-md border px-3 text-base"
+          style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
         >
           {MEALS.map((m) => (
             <option key={m.value} value={m.value}>
@@ -393,12 +393,12 @@ function PortionPicker({
         </select>
       </div>
 
-      <div className="mt-4 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
+      <div className="mt-4 rounded-md p-3" style={{ background: 'var(--ground)' }}>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="tabular text-2xl font-semibold">{estimate.display}</span>
+          <span className="data text-2xl font-semibold">{estimate.display}</span>
           <ConfidenceBadge level={estimate.confidence} />
         </div>
-        <p className="tabular mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
+        <p className="data mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
           {estimate.proteinG} g protein · {estimate.carbG} g carbs · {estimate.fatG} g fat
           {estimate.fibreG != null ? ` · ${estimate.fibreG} g fibre` : ''}
         </p>
@@ -408,7 +408,7 @@ function PortionPicker({
       </div>
 
       {error ? (
-        <p role="alert" className="mt-3 flex items-start gap-2 text-sm" style={{ color: '#b91c1c' }}>
+        <p role="alert" className="mt-3 flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
           <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
           {error}
         </p>

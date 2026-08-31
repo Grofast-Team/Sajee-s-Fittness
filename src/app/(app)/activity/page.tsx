@@ -1,4 +1,4 @@
-import { Card, CardTitle, Meter, WhyPanel } from '@/components/ui';
+import { Rail, Section, Why } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { StepEntry } from '@/components/quick-entry';
 import { WeekPlan } from '@/components/week-plan';
@@ -46,36 +46,33 @@ export default async function ActivityPage() {
         <h1 className="text-2xl font-semibold">Activity</h1>
       </header>
 
-      <Card>
-        <CardTitle hint="Today">Steps</CardTitle>
+      <Section title="Steps" meta="Today">
         {stepsSoFar === null ? (
           <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
             No steps recorded today. Your target is {day.stepTarget.toLocaleString()}.
           </p>
         ) : (
-          <Meter label="Steps" value={stepsSoFar} target={day.stepTarget} unit="steps" />
+          <Rail label="Steps" value={stepsSoFar} target={day.stepTarget} unit="steps" />
         )}
         {short !== null && short > 0 ? (
           <p className="mt-2 text-sm" style={{ color: 'var(--fg-muted)' }}>
             {short.toLocaleString()} to go — roughly a {stepsToMinutes(short)}-minute walk.
           </p>
         ) : null}
-        <WhyPanel label="Why this number?">
+        <Why label="Why this number?">
           {day.rationale.steps ? <p>{day.rationale.steps}</p> : null}
           <p className="mt-2">
             {nextWeek
               ? nextWeek.explanation
               : 'Once you have a week of step counts recorded, we will start adjusting this target up or down based on how often you actually hit it.'}
           </p>
-        </WhyPanel>
-      </Card>
+        </Why>
+      </Section>
 
       <StepEntry canSave={!day.isSample} current={day.stepsToday} />
 
       <WeekPlan week={week} canSave={!week.isSample} />
-
-      <Card>
-        <CardTitle hint="No equipment">Your strength session</CardTitle>
+      <Section title="Your strength session" meta="No equipment">
         <ul className="space-y-2 text-sm">
           {[
             ['Bodyweight squat', '3 × 8–12', '75s rest'],
@@ -85,7 +82,7 @@ export default async function ActivityPage() {
           ].map(([name, sets, rest]) => (
             <li key={name} className="flex items-baseline justify-between gap-3">
               <span className="font-medium">{name}</span>
-              <span className="tabular shrink-0" style={{ color: 'var(--fg-muted)' }}>
+              <span className="data shrink-0" style={{ color: 'var(--fg-muted)' }}>
                 {sets} · {rest}
               </span>
             </li>
@@ -95,17 +92,16 @@ export default async function ActivityPage() {
           Every movement has an easier version if it hurts or you cannot finish the reps. Stop if
           anything is genuinely painful — that is information, not weakness.
         </p>
-      </Card>
+      </Section>
 
       {walkBurn !== null ? (
-        <Card>
-          <CardTitle>A 30-minute brisk walk</CardTitle>
+        <Section title="A 30-minute brisk walk">
           <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
             Uses roughly {walkBurn} kcal beyond what you would have burned sitting. We show this but
             do not add it to your eating target — exercise estimates carry large error, and eating
             them back is one of the most reliable ways to stall.
           </p>
-        </Card>
+        </Section>
       ) : null}
     </div>
   );

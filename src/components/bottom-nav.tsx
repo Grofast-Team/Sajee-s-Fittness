@@ -40,7 +40,7 @@ export function BottomNav() {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className="flex min-h-14 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors duration-200"
-                style={{ color: active ? 'var(--primary)' : 'var(--fg-subtle)' }}
+                style={{ color: active ? 'var(--fg)' : 'var(--fg-subtle)' }}
               >
                 <Icon size={20} strokeWidth={active ? 2.4 : 1.8} aria-hidden />
                 {label}

@@ -61,7 +61,7 @@ export function TrendChart({
               x2={width - pad.right}
               y1={y(t)}
               y2={y(t)}
-              stroke="var(--border)"
+              stroke="var(--line)"
               strokeWidth={1}
             />
             <text
@@ -81,7 +81,7 @@ export function TrendChart({
           <circle key={p.date} cx={x(i)} cy={y(p.raw)} r={1.8} fill="var(--fg-subtle)" opacity={0.45} />
         ))}
 
-        <path d={trendPath} fill="none" stroke="var(--primary)" strokeWidth={2.5} strokeLinecap="round" />
+        <path d={trendPath} fill="none" stroke="var(--fg)" strokeWidth={2.5} strokeLinecap="round" />
 
         <text x={pad.left} y={height - 4} fontSize={9} fill="var(--fg-subtle)">
           {points[0].date.slice(5)}
@@ -93,7 +93,7 @@ export function TrendChart({
 
       <figcaption className="mt-1 flex items-center gap-4 text-xs" style={{ color: 'var(--fg-subtle)' }}>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-0.5 w-4 rounded" style={{ background: 'var(--primary)' }} />
+          <span className="inline-block h-0.5 w-4 rounded" style={{ background: 'var(--fg)' }} />
           Trend (kg)
         </span>
         <span className="inline-flex items-center gap-1.5">

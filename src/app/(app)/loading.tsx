@@ -9,8 +9,8 @@
 function Block({ height, width = '100%' }: { height: number; width?: string }) {
   return (
     <div
-      className="animate-pulse rounded-xl"
-      style={{ height, width, background: 'var(--surface-2)' }}
+      className="animate-pulse rounded-md"
+      style={{ height, width, background: 'var(--ground)' }}
     />
   );
 }

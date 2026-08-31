@@ -12,8 +12,8 @@ export function SampleBanner({ isSample }: { isSample: boolean }) {
   return (
     <div
       role="status"
-      className="rounded-xl px-3 py-2 text-xs font-medium"
-      style={{ background: 'rgb(245 158 11 / 0.16)', color: '#92400e' }}
+      className="rounded-md px-3 py-2 text-xs font-medium"
+      style={{ background: 'var(--signal-wash)', color: 'var(--signal)' }}
     >
       Sample profile — this is not your data. The numbers are real output from the calculation
       engines, computed from a sample person.

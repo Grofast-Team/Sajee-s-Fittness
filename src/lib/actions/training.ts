@@ -109,8 +109,14 @@ export async function ensureWeekPlanned(forDate?: string): Promise<TrainingResul
     return { ok: false, error: 'We could not build your week just now.' };
   }
 
-  revalidatePath('/activity');
-  revalidatePath('/today');
+  /*
+   * Deliberately no revalidatePath here.
+   *
+   * This runs during the Activity page's render, and Next.js throws if a route
+   * revalidates itself mid-render — which broke the whole screen. It is also
+   * unnecessary: the caller reads the week immediately afterwards and therefore
+   * already sees the rows just written.
+   */
   return { ok: true, message: plan.explanation };
 }
 

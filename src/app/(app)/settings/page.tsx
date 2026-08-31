@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Card, CardTitle, Unavailable } from '@/components/ui';
+import { Section, Unavailable } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { SignOutButton, DeleteAccountButton } from '@/components/settings-actions';
 import { getDayView } from '@/lib/data/day';
@@ -47,8 +47,7 @@ export default async function SettingsPage() {
         ) : null}
       </header>
 
-      <Card>
-        <CardTitle>Your plan</CardTitle>
+      <Section title="Your plan">
         <dl className="space-y-1.5 text-sm">
           {[
             ['Energy target', `${day.targetKcal.toLocaleString()} kcal`],
@@ -60,24 +59,22 @@ export default async function SettingsPage() {
           ].map(([k, v]) => (
             <div key={k} className="flex justify-between gap-4">
               <dt style={{ color: 'var(--fg-subtle)' }}>{k}</dt>
-              <dd className="tabular font-medium">{v}</dd>
+              <dd className="data font-medium">{v}</dd>
             </div>
           ))}
         </dl>
         <Link
           href="/onboarding"
-          className="mt-4 flex min-h-11 items-center justify-center rounded-xl text-sm font-semibold"
-          style={{ background: 'var(--surface-2)', color: 'var(--fg)' }}
+          className="mt-4 flex min-h-11 items-center justify-center rounded-md text-sm font-semibold"
+          style={{ background: 'var(--ground)', color: 'var(--fg)' }}
         >
           Redo setup
         </Link>
         <p className="mt-2 text-xs" style={{ color: 'var(--fg-subtle)' }}>
           Changing your answers builds a new plan. Your logs and weight history are kept.
         </p>
-      </Card>
-
-      <Card>
-        <CardTitle>Your constraints</CardTitle>
+      </Section>
+      <Section title="Your constraints">
         <dl className="space-y-1.5 text-sm">
           {[
             ['Budget', day.constraints.budgetPerDay ?? 'not set'],
@@ -98,13 +95,13 @@ export default async function SettingsPage() {
             </div>
           ))}
         </dl>
-      </Card>
+      </Section>
 
       {/* The Coach screen promises this exists. It has to actually exist. */}
-      <Card>
-        <CardTitle hint={memories.length > 0 ? `${memories.length} stored` : undefined}>
-          What the coach remembers
-        </CardTitle>
+      <Section
+        title="What the coach remembers"
+        meta={memories.length > 0 ? `${memories.length} stored` : undefined}
+      >
         {memories.length > 0 ? (
           <ul className="divide-y">
             {memories.map((m) => (
@@ -123,15 +120,13 @@ export default async function SettingsPage() {
             remove.
           </p>
         )}
-      </Card>
-
-      <Card>
-        <CardTitle>Your data</CardTitle>
+      </Section>
+      <Section title="Your data">
         <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
           Your weight, measurements, food logs and plan are private to your account. Administrators
           cannot read them. Deleting your account removes all of it permanently.
         </p>
-      </Card>
+      </Section>
 
       {!day.isSample ? (
         <div className="space-y-3">
@@ -145,8 +140,8 @@ export default async function SettingsPage() {
           action={
             <Link
               href="/login"
-              className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold"
-              style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
+              className="inline-flex min-h-11 items-center rounded-md px-4 text-sm font-semibold"
+              style={{ background: 'var(--fg)', color: 'var(--bg)' }}
             >
               Sign in
             </Link>

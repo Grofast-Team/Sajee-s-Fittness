@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { CircleAlert, Trash2 } from 'lucide-react';
-import { Card, CardTitle, ConfidenceBadge } from '@/components/ui';
+import { ConfidenceTag } from '@/components/ui';
 import { deleteFoodLog } from '@/lib/actions/food';
 import type { LoggedItem } from '@/lib/data/day';
 
@@ -22,22 +22,17 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
 
   if (items.length === 0) {
     return (
-      <Card>
-        <CardTitle hint="Today">Logged</CardTitle>
-        <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
+      <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
           Nothing logged yet today. Start with whatever you ate last — it does not have to be
-          perfect, and a rough entry beats no entry.
-        </p>
-      </Card>
+        perfect, and a rough entry beats no entry.
+      </p>
     );
   }
 
   return (
-    <Card>
-      <CardTitle hint={`${items.length} logged`}>Logged</CardTitle>
-
+    <div>
       {error ? (
-        <p role="alert" className="mb-3 flex items-start gap-2 text-sm" style={{ color: '#b91c1c' }}>
+        <p role="alert" className="mb-3 flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
           <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
           {error}
         </p>
@@ -53,19 +48,19 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                   {entry.description}
                 </p>
                 <div className="mt-1">
-                  <ConfidenceBadge level={entry.confidence} />
+                  <ConfidenceTag level={entry.confidence} />
                 </div>
               </div>
 
               <div className="flex shrink-0 items-start gap-1">
                 <div className="text-right">
-                  <p className="tabular text-sm font-semibold">
+                  <p className="data text-sm font-semibold">
                     {/* An entry saved as a range stays a range. */}
                     {entry.kcalLow !== null && entry.kcalHigh !== null
                       ? `${entry.kcalLow}–${entry.kcalHigh} kcal`
                       : `${entry.kcal} kcal`}
                   </p>
-                  <p className="tabular text-xs" style={{ color: 'var(--fg-subtle)' }}>
+                  <p className="data text-xs" style={{ color: 'var(--fg-subtle)' }}>
                     {entry.proteinG} g protein
                   </p>
                 </div>
@@ -79,7 +74,7 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                     }}
                     aria-label={`Remove ${entry.description}`}
                     aria-expanded={confirming === entry.id}
-                    className="flex size-11 cursor-pointer items-center justify-center rounded-xl transition-colors duration-200"
+                    className="flex size-11 cursor-pointer items-center justify-center rounded-md transition-colors duration-200"
                     style={{ color: 'var(--fg-subtle)' }}
                   >
                     <Trash2 size={16} aria-hidden />
@@ -92,8 +87,8 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                 you are about to remove visible while you decide. */}
             {confirming === entry.id ? (
               <div
-                className="mt-2 flex flex-wrap items-center gap-2 rounded-xl p-3"
-                style={{ background: 'var(--surface-2)' }}
+                className="mt-2 flex flex-wrap items-center gap-2 rounded-md p-3"
+                style={{ background: 'var(--ground)' }}
               >
                 <span className="flex-1 text-sm">Remove this entry?</span>
                 <button
@@ -106,8 +101,8 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                       setConfirming(null);
                     })
                   }
-                  className="min-h-11 cursor-pointer rounded-xl px-3 text-sm font-semibold"
-                  style={{ background: '#b91c1c', color: '#ffffff' }}
+                  className="min-h-11 cursor-pointer rounded-md px-3 text-sm font-semibold"
+                  style={{ background: 'var(--alarm)', color: '#ffffff' }}
                 >
                   {pending ? 'Removing…' : 'Remove'}
                 </button>
@@ -115,7 +110,7 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                   type="button"
                   disabled={pending}
                   onClick={() => setConfirming(null)}
-                  className="min-h-11 cursor-pointer rounded-xl px-3 text-sm font-medium"
+                  className="min-h-11 cursor-pointer rounded-md px-3 text-sm font-medium"
                 >
                   Keep
                 </button>
@@ -124,6 +119,6 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
           </li>
         ))}
       </ul>
-    </Card>
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { CircleAlert, CircleCheck, Loader2 } from 'lucide-react';
-import { Button, Card, CardTitle } from '@/components/ui';
+import { Button, Panel } from '@/components/ui';
 import { logMeasurement, logSleep, logSteps, logWater, type TrackResult } from '@/lib/actions/tracking';
 
 /**
@@ -15,21 +15,21 @@ import { logMeasurement, logSleep, logSteps, logWater, type TrackResult } from '
  */
 
 const inputStyle = {
-  background: 'var(--surface-2)',
+  background: 'var(--ground)',
   color: 'var(--fg)',
-  borderColor: 'var(--border)',
+  borderColor: 'var(--line)',
 };
 
 function Feedback({ state }: { state: TrackResult | null }) {
   if (!state) return null;
 
   return state.ok ? (
-    <p role="status" className="mt-3 flex items-start gap-2 text-sm" style={{ color: 'var(--accent)' }}>
+    <p role="status" className="mt-3 flex items-start gap-2 text-sm" style={{ color: 'var(--confirm)' }}>
       <CircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden />
       {state.message}
     </p>
   ) : (
-    <p role="alert" className="mt-3 flex items-start gap-2 text-sm" style={{ color: '#b91c1c' }}>
+    <p role="alert" className="mt-3 flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
       <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
       {state.error}
     </p>
@@ -60,8 +60,8 @@ export function WeightEntry({ canSave, lastWeightKg }: { canSave: boolean; lastW
   }
 
   return (
-    <Card>
-      <CardTitle hint="Today">Record a weigh-in</CardTitle>
+    <Panel>
+      <h3 className="eyebrow mb-4">Record a weigh-in</h3>
 
       <div className="flex gap-2">
         <div className="flex-1">
@@ -79,7 +79,7 @@ export function WeightEntry({ canSave, lastWeightKg }: { canSave: boolean; lastW
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
               placeholder={lastWeightKg ? lastWeightKg.toFixed(1) : '—'}
-              className="min-h-11 w-full rounded-xl border px-3 text-base"
+              className="data min-h-11 w-full rounded-md border px-3 text-base"
               style={inputStyle}
             />
             <span className="shrink-0 text-sm" style={{ color: 'var(--fg-subtle)' }}>
@@ -102,7 +102,7 @@ export function WeightEntry({ canSave, lastWeightKg }: { canSave: boolean; lastW
               max={250}
               value={waist}
               onChange={(e) => setWaist(e.target.value)}
-              className="min-h-11 w-full rounded-xl border px-3 text-base"
+              className="data min-h-11 w-full rounded-md border px-3 text-base"
               style={inputStyle}
             />
             <span className="shrink-0 text-sm" style={{ color: 'var(--fg-subtle)' }}>
@@ -140,7 +140,7 @@ export function WeightEntry({ canSave, lastWeightKg }: { canSave: boolean; lastW
           Sign in and finish setup to record your own measurements.
         </p>
       ) : null}
-    </Card>
+    </Panel>
   );
 }
 
@@ -157,8 +157,9 @@ export function StepEntry({ canSave, current }: { canSave: boolean; current: num
   }
 
   return (
-    <Card>
-      <CardTitle hint="Today">Record your steps</CardTitle>
+    <Panel>
+
+      <h3 className="eyebrow mb-4">Record your steps</h3>
 
       <label htmlFor="steps" className="block text-sm font-medium">
         Steps so far
@@ -172,7 +173,7 @@ export function StepEntry({ canSave, current }: { canSave: boolean; current: num
         value={steps}
         onChange={(e) => setSteps(e.target.value)}
         placeholder="e.g. 4200"
-        className="mt-1.5 min-h-11 w-full rounded-xl border px-3 text-base"
+        className="data mt-1.5 min-h-11 w-full rounded-md border px-3 text-base"
         style={inputStyle}
       />
 
@@ -202,7 +203,7 @@ export function StepEntry({ canSave, current }: { canSave: boolean; current: num
           Sign in and finish setup to record your steps.
         </p>
       ) : null}
-    </Card>
+    </Panel>
   );
 }
 
@@ -242,24 +243,59 @@ export function WaterEntry({
   }
 
   return (
-    <Card>
-      <CardTitle hint={`${(targetMl / 1000).toFixed(1)} L target`}>Water</CardTitle>
+    <Panel>
 
-      <div className="flex flex-wrap gap-1.5" role="img" aria-label={`${filled} of ${glasses} glasses`}>
-        {Array.from({ length: glasses }, (_, i) => (
+      {/*
+       * A single rail rather than a grid of empty boxes. Ten outlined squares
+       * took a third of the screen to communicate one number, and read as
+       * decoration rather than data.
+       */}
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm font-medium">Water</span>
+        <span className="data text-sm">
+          <span style={{ color: 'var(--fg)' }}>{optimistic.toLocaleString()}</span>
+          <span style={{ color: 'var(--fg-subtle)' }}> / {targetMl.toLocaleString()}</span>
+          <span className="eyebrow ml-1.5">ml</span>
+        </span>
+      </div>
+
+      <div
+        className="relative mt-2 w-full overflow-hidden"
+        style={{ height: 7, background: 'var(--ground)' }}
+        role="progressbar"
+        aria-label={`Water: ${optimistic} of ${targetMl} millilitres`}
+        aria-valuenow={optimistic}
+        aria-valuemin={0}
+        aria-valuemax={targetMl}
+      >
+        <div
+          className="absolute inset-y-0 left-0 transition-[width] duration-300"
+          style={{
+            width: `${Math.min(100, (optimistic / targetMl) * 100)}%`,
+            background: 'var(--fg)',
+          }}
+        />
+      </div>
+
+      <div className="relative mt-1 h-2" aria-hidden>
+        {Array.from({ length: 11 }, (_, i) => (
           <span
             key={i}
-            className="h-7 w-5 rounded-b-md rounded-t-sm border"
+            className="absolute top-0"
             style={{
-              background: i < filled ? 'var(--primary)' : 'var(--surface-2)',
-              borderColor: i < filled ? 'var(--primary)' : 'var(--border)',
+              left: `${i * 10}%`,
+              width: 1,
+              height: i % 5 === 0 ? 7 : 4,
+              background: i % 5 === 0 ? 'var(--fg-subtle)' : 'var(--line-strong)',
             }}
           />
         ))}
       </div>
 
-      <p className="tabular mt-2 text-sm" style={{ color: 'var(--fg-muted)' }}>
-        {optimistic.toLocaleString()} of {targetMl.toLocaleString()} ml
+      <p className="mt-2 text-xs" style={{ color: 'var(--fg-subtle)' }}>
+        {glasses - filled > 0
+          ? `${glasses - filled} more glasses to target.`
+          : 'Target reached. More is not better.'}
       </p>
 
       <Feedback state={state} />
@@ -273,7 +309,7 @@ export function WaterEntry({
           'Add a glass (250 ml)'
         )}
       </Button>
-    </Card>
+    </Panel>
   );
 }
 
@@ -314,12 +350,33 @@ export function SleepEntry({
   }
 
   return (
-    <Card>
-      <CardTitle hint={`${targetHours} h target`}>Last night&rsquo;s sleep</CardTitle>
+    /*
+     * Collapsed by default. Sleep is the least consequential thing on the
+     * dashboard and was visually the heaviest — a full form with five buttons
+     * anchoring the bottom of the page. As a disclosure it costs one line until
+     * someone actually wants it.
+     */
+    <details className="group">
+      <summary
+        className="flex min-h-11 cursor-pointer list-none items-baseline justify-between gap-3 border-b"
+        style={{ borderColor: 'var(--line)' }}
+      >
+        <span className="text-sm font-medium">Last night&rsquo;s sleep</span>
+        <span className="data text-sm" style={{ color: 'var(--fg-subtle)' }}>
+          {currentMinutes !== null ? `${(currentMinutes / 60).toFixed(1)} h` : 'not recorded'}
+          <span className="eyebrow ml-2">record +</span>
+        </span>
+      </summary>
 
-      <label htmlFor="sleep-hours" className="block text-sm font-medium">
-        How long did you sleep?
-      </label>
+      <div className="pt-4">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <label htmlFor="sleep-hours" className="text-sm font-medium">
+            How long did you sleep?
+          </label>
+          <span className="eyebrow">
+            <span className="data">{targetHours}</span> h target
+          </span>
+        </div>
       <div className="mt-1.5 flex items-center gap-2">
         <input
           id="sleep-hours"
@@ -331,7 +388,7 @@ export function SleepEntry({
           value={hours}
           onChange={(e) => setHours(e.target.value)}
           placeholder="e.g. 7"
-          className="min-h-11 w-full rounded-xl border px-3 text-base"
+          className="data min-h-11 w-full rounded-md border px-3 text-base"
           style={inputStyle}
         />
         <span className="shrink-0 text-sm" style={{ color: 'var(--fg-subtle)' }}>
@@ -359,11 +416,11 @@ export function SleepEntry({
               type="button"
               aria-pressed={quality === q.value}
               onClick={() => setQuality(quality === q.value ? null : q.value)}
-              className="min-h-11 flex-1 cursor-pointer rounded-xl border text-xs font-semibold transition-colors duration-200"
+              className="min-h-11 flex-1 cursor-pointer rounded-md border text-xs font-semibold transition-colors duration-200"
               style={{
-                background: quality === q.value ? 'var(--primary)' : 'var(--surface-2)',
-                color: quality === q.value ? 'var(--primary-fg)' : 'var(--fg)',
-                borderColor: quality === q.value ? 'var(--primary)' : 'var(--border)',
+                background: quality === q.value ? 'var(--fg)' : 'var(--ground)',
+                color: quality === q.value ? 'var(--bg)' : 'var(--fg)',
+                borderColor: quality === q.value ? 'var(--fg)' : 'var(--line)',
               }}
             >
               {q.label}
@@ -394,6 +451,7 @@ export function SleepEntry({
           'Record'
         )}
       </Button>
-    </Card>
+      </div>
+    </details>
   );
 }

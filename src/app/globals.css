@@ -1,96 +1,90 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens.
+ * Design tokens. See docs/DESIGN.md for the reasoning.
  *
- * Direction: calm, clinical-but-warm. Deliberately not the aggressive
- * black-and-neon aesthetic of most fitness apps - the audience is a beginner
- * who is nervous about this, not a bodybuilder. Cyan and green read as
- * "health" without shouting.
- *
- * Two deliberate deviations from the generated design system:
- *   1. Body text is Inter, not Raleway. Raleway's low-contrast strokes and
- *      lining figures are hard to read at the small numeric sizes this app is
- *      full of. Lora is kept for headings, where its warmth is the point.
- *   2. Type is not oversized. "Exaggerated minimalism" suits a luxury landing
- *      page; here, big numbers everywhere would make a calorie target feel like
- *      a verdict.
+ * The one idea: colour carries meaning. Turmeric means estimated, pine means
+ * measured. Nothing is tinted just to look branded.
  */
 
 @theme {
-  /* Supplied by next/font in `layout.tsx`, with real fallbacks so the app is
-     legible before the webfonts land. */
-  --font-display: var(--font-lora), ui-serif, Georgia, serif;
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-
-  --color-brand-50: #ecfeff;
-  --color-brand-100: #cffafe;
-  --color-brand-200: #a5f3fc;
-  --color-brand-300: #67e8f9;
-  --color-brand-400: #22d3ee;
-  --color-brand-500: #06b6d4;
-  --color-brand-600: #0891b2;
-  --color-brand-700: #0e7490;
-  --color-brand-800: #155e75;
-  --color-brand-900: #164e63;
-
-  --color-grow-500: #10b981;
-  --color-grow-600: #059669;
-  --color-grow-700: #047857;
-
-  --color-warn-500: #f59e0b;
-  --color-danger-500: #dc2626;
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-data: var(--font-plex-mono), ui-monospace, 'SFMono-Regular', monospace;
 }
 
 :root {
-  --bg: #f7fbfc;
-  --surface: #ffffff;
-  --surface-2: #f0f7f9;
-  --border: #d9e9ee;
-  --fg: #10333d;
-  --fg-muted: #4d7784;
-  --fg-subtle: #6f939e;
-  --primary: #0e7490;
-  --primary-fg: #ffffff;
-  --accent: #047857;
-  --ring: #0891b2;
-  --shadow-card: 0 1px 2px rgb(16 51 61 / 0.05), 0 8px 24px -12px rgb(16 51 61 / 0.12);
+  /* Warm paper, not clinical white. This app is about kitchens. */
+  --bg: #f7f5f0;
+  --ground: #efece4;
+  --surface: #fffefb;
+  --line: #ded8ca;
+  --line-strong: #c4bcaa;
+
+  --fg: #16191b;
+  --fg-muted: #5a5750;
+  --fg-subtle: #86817a;
+
+  /* Turmeric — estimated, uncertain, "we are not sure yet". */
+  --signal: #b8801a;
+  --signal-bright: #e0a126;
+  --signal-wash: rgb(224 161 38 / 0.14);
+
+  /* Deep pine — measured, confirmed, done. */
+  --confirm: #1f6f5c;
+  --confirm-wash: rgb(31 111 92 / 0.12);
+
+  /* Reserved strictly for safety limits and destructive actions. */
+  --alarm: #a8382a;
+  --alarm-wash: rgb(192 68 46 / 0.1);
+
+  --on-dark: #f7f5f0;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0a1416;
-    --surface: #0f1e22;
-    --surface-2: #14282d;
-    --border: #1e3b42;
-    --fg: #e6f4f7;
-    --fg-muted: #9dbcc4;
-    --fg-subtle: #7ba0aa;
-    --primary: #22d3ee;
-    --primary-fg: #062026;
-    --accent: #34d399;
-    --ring: #22d3ee;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --bg: #0e1113;
+    --ground: #14181a;
+    --surface: #191e21;
+    --line: #262d31;
+    --line-strong: #3a4247;
+
+    --fg: #edeae3;
+    --fg-muted: #9a978f;
+    --fg-subtle: #6f6c66;
+
+    --signal: #e0a126;
+    --signal-bright: #f0b642;
+    --signal-wash: rgb(224 161 38 / 0.16);
+
+    --confirm: #3d9e86;
+    --confirm-wash: rgb(61 158 134 / 0.16);
+
+    --alarm: #d1594a;
+    --alarm-wash: rgb(209 89 74 / 0.14);
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #0a1416;
-  --surface: #0f1e22;
-  --surface-2: #14282d;
-  --border: #1e3b42;
-  --fg: #e6f4f7;
-  --fg-muted: #9dbcc4;
-  --fg-subtle: #7ba0aa;
-  --primary: #22d3ee;
-  --primary-fg: #062026;
-  --accent: #34d399;
-  --ring: #22d3ee;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --bg: #0e1113;
+  --ground: #14181a;
+  --surface: #191e21;
+  --line: #262d31;
+  --line-strong: #3a4247;
+  --fg: #edeae3;
+  --fg-muted: #9a978f;
+  --fg-subtle: #6f6c66;
+  --signal: #e0a126;
+  --signal-bright: #f0b642;
+  --signal-wash: rgb(224 161 38 / 0.16);
+  --confirm: #3d9e86;
+  --confirm-wash: rgb(61 158 134 / 0.16);
+  --alarm: #d1594a;
+  --alarm-wash: rgb(209 89 74 / 0.14);
 }
 
 * {
-  border-color: var(--border);
+  border-color: var(--line);
 }
 
 html {
@@ -102,30 +96,52 @@ body {
   color: var(--fg);
   font-family: var(--font-sans);
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  /* Room for the fixed bottom navigation, plus the iOS home indicator. */
-  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
 }
 
-h1, h2, h3 {
+/*
+ * Display type. Bricolage is variable — the tight tracking and heavier optical
+ * weight is what stops headings reading as generic sans.
+ */
+.display {
   font-family: var(--font-display);
-  letter-spacing: -0.015em;
-  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
-/* Numeric readouts line up in columns and never reflow as digits change. */
-.tabular {
+/* Every number in the app. Numbers are the content, so they get their own
+   face — and tabular figures stop columns twitching as digits change. */
+.data {
+  font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+  letter-spacing: -0.02em;
 }
 
-/* Every interactive element keeps a visible focus ring. Removing these is the
-   single most common accessibility regression in a redesign. */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--ring);
+/* Small uppercase label. Used for section eyebrows and units. */
+.eyebrow {
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+/* Hairline rule. Sections separate by line and ground shift rather than by
+   wrapping everything in its own bordered card. */
+.rule {
+  height: 1px;
+  background: var(--line);
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--signal-bright);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -137,4 +153,20 @@ h1, h2, h3 {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* The rail settles into place on load. One orchestrated moment, not scattered
+   effects — and it reads as an instrument coming to rest. */
+@keyframes rail-settle {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.rail-fill {
+  transform-origin: left center;
+  animation: rail-settle 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }

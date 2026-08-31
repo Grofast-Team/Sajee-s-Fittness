@@ -1,5 +1,5 @@
 import { Barcode, Mic, Zap } from 'lucide-react';
-import { Card, CardTitle, Meter, Unavailable } from '@/components/ui';
+import { Rail, Section, Unavailable } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { ScalePhotoLogger } from '@/components/scale-photo';
 import { FoodSearch } from '@/components/food-search';
@@ -11,77 +11,82 @@ export const metadata = { title: 'Food — FitCoach' };
 
 export default async function FoodPage() {
   const day = await getDayView();
+  const remaining = day.remaining.kcalRemaining;
+  const over = remaining < 0;
 
   return (
-    <div className="space-y-4">
+    <>
       <SampleBanner isSample={day.isSample} />
 
-      <header>
-        <h1 className="text-2xl font-semibold">Food</h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
+      <header className="pb-7 pt-6">
+        <p className="eyebrow mb-5">Food</p>
+        <div className="flex items-end gap-3">
+          <span
+            className="data leading-none"
+            style={{
+              fontSize: 'clamp(3rem, 15vw, 4.2rem)',
+              fontWeight: 500,
+              color: over ? 'var(--signal)' : 'var(--fg)',
+            }}
+          >
+            {Math.abs(remaining).toLocaleString()}
+          </span>
+          <span className="pb-1.5">
+            <span className="eyebrow block">kcal</span>
+            <span className="block text-sm" style={{ color: 'var(--fg-muted)' }}>
+              {over ? 'over' : 'left'}
+            </span>
+          </span>
+        </div>
+        <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
           {day.remaining.message}
         </p>
       </header>
-
-      <Card>
-        <div className="space-y-3.5">
-          <Meter label="Energy" value={day.consumedKcal} target={day.targetKcal} unit="kcal" />
-          <Meter
-            label="Protein"
-            value={day.consumedProteinG}
-            target={day.proteinTargetG}
-            unit="g"
-            tone="grow"
-          />
+      <Section title="Today so far">
+        <div className="space-y-5">
+          <Rail label="Energy" value={day.consumedKcal} target={day.targetKcal} unit="kcal" size="lg" />
+          <Rail label="Protein" value={day.consumedProteinG} target={day.proteinTargetG} unit="g" />
         </div>
-      </Card>
+      </Section>
+      {/* The photo path leads because it is the flagship, but search sits right
+          beneath it and needs no AI — logging must never depend on a model
+          being reachable. */}
+      <Section title="Add food">
+        {aiConfigured ? (
+          <ScalePhotoLogger />
+        ) : (
+          <Unavailable
+            title="Photo logging is switched off"
+            detail="No AI provider is configured on this deployment, so photo analysis is disabled rather than faked. Search below works without it."
+          />
+        )}
 
-      {/* The photo path is the flagship, so it leads. The others are always
-          available underneath — logging must never depend on AI being up. */}
-      {aiConfigured ? (
-        <ScalePhotoLogger />
-      ) : (
-        <Unavailable
-          title="Photo logging is not configured"
-          detail={
-            'This deployment has no AI provider set, so photo analysis is switched off rather ' +
-            'than faked. Set AI_GATEWAY_API_KEY to enable it. Everything below works without it.'
-          }
-        />
-      )}
-
-      <FoodSearch canSave={supabaseConfigured && !day.isSample} />
-
-      <Card>
-        <CardTitle>Other ways to log</CardTitle>
-        <ul className="space-y-2">
+        <div className="mt-6">
+          <FoodSearch canSave={supabaseConfigured && !day.isSample} />
+        </div>
+      </Section>
+      <Section title="Not built yet">
+        <ul className="space-y-3">
           {[
-            { Icon: Zap, label: 'Quick add', detail: 'Food, quantity, meal. Ten seconds.', available: false },
-            { Icon: Mic, label: 'Say what you ate', detail: '"Two idli and a bowl of sambar."', available: false },
-            { Icon: Barcode, label: 'Scan a barcode', detail: 'For packaged food with label data.', available: false },
-          ].map(({ Icon, label, detail, available }) => (
-            <li key={label}>
-              <button
-                type="button"
-                disabled={!available}
-                className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-left transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-45"
-                style={{ background: 'var(--surface-2)' }}
-              >
-                <Icon size={20} style={{ color: 'var(--primary)' }} aria-hidden />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{label}</span>
-                  <span className="block truncate text-xs" style={{ color: 'var(--fg-subtle)' }}>
-                    {available ? detail : 'Not built yet'}
-                  </span>
-                </span>
-              </button>
+            { Icon: Zap, label: 'Quick add', detail: 'Food, quantity, meal — ten seconds.' },
+            { Icon: Mic, label: 'Say what you ate', detail: '"Two idli and a bowl of sambar."' },
+            { Icon: Barcode, label: 'Scan a barcode', detail: 'For packaged food with label data.' },
+          ].map(({ Icon, label, detail }) => (
+            <li key={label} className="flex items-start gap-3" style={{ opacity: 0.5 }}>
+              <Icon size={16} className="mt-0.5 shrink-0" aria-hidden />
+              <div>
+                <p className="text-sm">{label}</p>
+                <p className="text-xs" style={{ color: 'var(--fg-subtle)' }}>
+                  {detail}
+                </p>
+              </div>
             </li>
           ))}
         </ul>
-      </Card>
-
-      <LoggedMeals items={day.items} canEdit={!day.isSample} />
-
-    </div>
+      </Section>
+      <Section title="Logged" meta={day.items.length > 0 ? `${day.items.length} today` : undefined}>
+        <LoggedMeals items={day.items} canEdit={!day.isSample} />
+      </Section>
+    </>
   );
 }
