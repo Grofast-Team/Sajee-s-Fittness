@@ -19,7 +19,7 @@ Live verification performed:
 - Alias search exercised against the real RPC: thosai/dosai/idly/sambhar/thayir/
   "meal maker" all resolve correctly; gibberish returns nothing
 - **Cross-user RLS proven with two real accounts and now automated**: see
-  `tests/rls/isolation.test.ts` — 18 tests walking every user-owned table
+  `tests/rls/isolation.test.ts` — 19 tests walking every user-owned table
 - Anonymous key returns empty on every user table
 - `handle_new_user()` bootstraps profile/lifestyle/food_profile on signup
 - Rollup triggers verified: food, steps, water and sleep all land in `daily_logs`,
