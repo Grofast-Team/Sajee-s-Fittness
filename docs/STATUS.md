@@ -4,7 +4,7 @@ An honest account of what exists, what is partial, and what has not been built.
 The brief's rule 98 applies to this document as much as to the UI: nothing is
 described as working that has not been run.
 
-Verified by `npm test` (189 passing), `npm run test:rls` (19 passing against a
+Verified by `npm test` (191 passing), `npm run test:rls` (19 passing against a
 live project), `npm run build` (clean), `eslint` (clean),
 and — as of this revision — **against a live Supabase project and a production
 Vercel deployment**, not only in sample mode.
@@ -12,11 +12,9 @@ Vercel deployment**, not only in sample mode.
 Live verification performed:
 
 - All 15 migrations applied to a fresh project, first attempt, no manual fixes
-- **The development project is currently ahead of git.** Migrations
-  `20260903120001`–`20260903120004` (video system, progression seeding, ladder
-  fixes) are applied to the linked project but are not yet committed. A fresh
-  clone will not reproduce that database until they land. `supabase migration
-  list` is the authority on what is actually applied.
+- Migrations `20260903120001`–`20260903120004` (video system, progression
+  seeding, ladder fixes, level history) applied and committed. `supabase
+  migration list` is the authority on what is actually applied.
 - 51 foods, 71 aliases, 34 serving units, 12 exercises, 4 workouts, 6 lessons seeded
 - Alias search exercised against the real RPC: thosai/dosai/idly/sambhar/thayir/
   "meal maker" all resolve correctly; gibberish returns nothing
@@ -98,7 +96,8 @@ Live verification performed:
 | Exercise library with instructions, mistakes, easier variants | **Done** (12 exercises seeded) |
 | Workout templates | **Done** (4 seeded) |
 | Weekly plan + missed-session recovery UI | **Done** — `ensureWeekPlanned()` writes the week on first visit and is idempotent; `updateSession` persists completed / partial / skipped / moved, and a moved session is re-created on its new date rather than left as a dead "moved" row |
-| Perceived difficulty and pain capture | **Not built in committed code** — `session_feedback` exists and is applied, but nothing committed writes to it |
+| Perceived difficulty and pain capture | **Done** — `SessionFeedback` asks difficulty and pain separately, because hard is often correct while pain never is; `logSessionFeedback` writes `session_feedback`, which is the only signal the progression engine reads |
+| Video / progression engines | **Done**, tested — `progression.ts` and `video-recommendation.ts`. The library itself is empty: `videos` has no approved rows, so nothing is recommendable yet |
 | MET-based expenditure, net of resting | **Done**, tested |
 | Device integrations (Apple Health / Health Connect) | **Not built** — manual entry only, honestly labelled |
 
@@ -167,17 +166,21 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
 2. **Sleep entry UI.** `logSleep` exists but nothing calls it, so
    `daily_logs.sleep_minutes` stays null and the adherence engine's sleep
    component always scores zero for real users.
-3. **Difficulty and pain capture.** `session_feedback` is applied and has RLS
-   coverage, but no committed UI writes to it. Until something does, the
-   progression engine has no signal and `workout_plans.rpe` — which cannot
-   distinguish "hard" from "hurts" — remains the only difficulty column, and
-   is itself unwritten.
+3. **Curate the video library.** `videos` is empty and `review_status` defaults
+   to `pending`, so `video-recommendation.ts` has nothing approved to return.
+   The engine, the metadata and the review gate are all built; only the content
+   is missing.
 4. **Scheduled adaptation.** The adapt engine is built and tested but nothing
-   runs it weekly, so plans never actually change. It also has no training
-   lever yet: its decision set can move intake and steps only.
+   runs it weekly, so intake and step targets never actually change.
+   `progression.ts` owns the training lever separately, and does run.
 5. Verify the seed nutrition data.
 6. Coach chat endpoint.
 7. Test the photo pipeline against real scale photographs.
+8. Deprecate `workout_plans.rpe`. `session_feedback.difficulty` is now the
+   source of truth for how hard a session was, and `rpe` cannot distinguish
+   "hard" from "hurts". It is unwritten but still present, so a future
+   contributor may reasonably assume it is the column to use.
 
-Workout completion used to head this list and no longer does: the week grid
-persists, so `workout_adherence` can now be computed from real rows.
+Two items used to head this list and no longer do. Workout completion: the week
+grid persists, so `workout_adherence` is computed from real rows. Difficulty
+capture: `session_feedback` is written by the post-session panel.
