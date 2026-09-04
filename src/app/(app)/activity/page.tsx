@@ -2,8 +2,11 @@ import { Panel, PageHeader, Ring, Section, Why } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { StepEntry } from '@/components/quick-entry';
 import { WeekPlan } from '@/components/week-plan';
+import { LevelPanel, NextStepCard } from '@/components/next-step';
+import { SessionFeedback } from '@/components/session-feedback';
 import { getDayView } from '@/lib/data/day';
 import { getWeekView } from '@/lib/data/week';
+import { getNextStep } from '@/lib/data/next-step';
 import { ensureWeekPlanned } from '@/lib/actions/training';
 import { progressStepGoal, stepsToMinutes } from '@/lib/engines/steps';
 import { activityKcal } from '@/lib/engines/energy';
@@ -22,7 +25,11 @@ export const metadata = { title: 'Activity — FitCoach' };
  * Nothing here scolds. A missed target is stated as a distance still to cover,
  * never as a failure.
  */
-export default async function ActivityPage() {
+export default async function ActivityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mins?: string }>;
+}) {
   const day = await getDayView();
 
   // Generate this week's sessions on first visit. `ensureWeekPlanned` is
@@ -32,7 +39,13 @@ export default async function ActivityPage() {
     await ensureWeekPlanned();
   }
 
-  const week = await getWeekView();
+  // How long someone has is a property of today, not of them, so it lives in
+  // the URL rather than in the profile. Clamped because it comes from a query
+  // string and anything can be typed there.
+  const requested = Number((await searchParams).mins);
+  const minutes = Number.isFinite(requested) ? Math.min(120, Math.max(5, requested)) : 30;
+
+  const [week, step] = await Promise.all([getWeekView(), getNextStep(minutes)]);
 
   const stepsSoFar = day.stepsToday;
   const short = stepsSoFar === null ? null : Math.max(0, day.stepTarget - stepsSoFar);
@@ -55,7 +68,42 @@ export default async function ActivityPage() {
 
       <PageHeader title="Activity" lede="Where today's movement stands, and what is left." />
 
+      {/*
+       * The session runs full width and leads the page.
+       *
+       * It became the main event when it stopped being a fixed list and started
+       * being chosen for the person, and it is by far the tallest thing here —
+       * in a half-width column it left roughly 900px of dead space beside it on
+       * a desktop monitor, and pushed itself below two step cards on a phone.
+       * Full width fixes both, and gives the exercise rows and time picker room
+       * to breathe.
+       */}
+      <div className="mb-4 lg:mb-5">
+        <NextStepCard step={step} minutes={minutes} />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-5">
+        {/* ---------------- After the session ---------------- */}
+        <div className="space-y-4 lg:space-y-5">
+          {!step.isRestDay ? (
+            /* Anchor target: the week plan's "Record how it went" links here,
+               so there is one route to completing today's session. */
+            <div id="how-did-it-go" className="scroll-mt-6">
+            <Panel>
+              <Section title="How did it go?">
+                <SessionFeedback
+                  workoutPlanId={step.workoutPlanId}
+                  canSave={!step.isSample}
+                  plannedMinutes={step.sessionMinutes}
+                />
+              </Section>
+            </Panel>
+            </div>
+          ) : null}
+
+          <LevelPanel step={step} />
+        </div>
+
         {/* ---------------- Steps ---------------- */}
         <div className="space-y-4 lg:space-y-5">
           <Panel feature className="sm:flex sm:items-center sm:gap-7">
@@ -115,36 +163,6 @@ export default async function ActivityPage() {
           <Panel>
             <Section title="Record your steps">
               <StepEntry canSave={!day.isSample} current={day.stepsToday} />
-            </Section>
-          </Panel>
-        </div>
-
-        {/* ---------------- Strength ---------------- */}
-        <div className="space-y-4 lg:space-y-5">
-          <Panel>
-            <Section title="Your strength session" meta="No equipment">
-              <ul className="space-y-0">
-                {[
-                  ['Bodyweight squat', '3 × 8–12', '75s rest'],
-                  ['Push-up from knees', '3 × 6–10', '75s rest'],
-                  ['Glute bridge', '3 × 10–15', '60s rest'],
-                  ['Plank', '3 × 20s hold', '60s rest'],
-                ].map(([name, sets, rest]) => (
-                  <li
-                    key={name}
-                    className="flex items-baseline justify-between gap-3 border-b py-2.5 first:pt-0 last:border-0 last:pb-0"
-                  >
-                    <span className="text-sm font-medium">{name}</span>
-                    <span className="data shrink-0 text-[13px]" style={{ color: 'var(--fg-muted)' }}>
-                      {sets} · {rest}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-4 text-[13px] leading-relaxed" style={{ color: 'var(--fg-subtle)' }}>
-                Every movement has an easier version if it hurts or you cannot finish the reps. Stop
-                if anything is genuinely painful — that is information, not weakness.
-              </p>
             </Section>
           </Panel>
 

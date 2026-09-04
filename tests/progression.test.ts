@@ -102,6 +102,20 @@ describe('checkReadiness', () => {
     expect(r.ready).toBe(false);
   });
 
+  it('does not report 0% adherence when nothing was ever scheduled', () => {
+    // "0% of planned sessions done" reads as an accusation. With nothing
+    // planned there is nothing to have missed, and the checklist has to say so.
+    const r = checkReadiness({ ...ready, consistency: 0, plannedSessions: 0 });
+    const consistency = r.checks.find((c) => c.label === 'Consistency');
+    expect(consistency?.detail).not.toMatch(/0%/);
+    expect(consistency?.detail).toMatch(/nothing scheduled/i);
+  });
+
+  it('still reports a real miss rate when sessions were planned', () => {
+    const r = checkReadiness({ ...ready, consistency: 0.25, plannedSessions: 4 });
+    expect(r.checks.find((c) => c.label === 'Consistency')?.detail).toMatch(/25%/);
+  });
+
   it('is blocked outright by a safety restriction', () => {
     const r = checkReadiness({ ...ready, restrictions: ['high_intensity_training'] });
     expect(r.ready).toBe(false);
@@ -149,6 +163,42 @@ describe('decideProgression', () => {
     expect(r.decision).toBe('hold_for_pain');
     expect(r.toLevel).toBe(2);
     expect(r.message).toMatch(/pain is a signal to stop|have it looked at/i);
+  });
+
+  /*
+   * The evidence that earns a promotion must not also earn the next one.
+   *
+   * This came from a real bug: signals were derived from the user's *total*
+   * feedback count, so the eight sessions that moved someone 2 -> 3 were still
+   * on the books immediately afterwards and satisfied the checklist again.
+   * Two page loads took a consistent beginner to level 4. The fix was to count
+   * from `profiles.fitness_level_set_at`; these tests pin the contract that
+   * `readLevelState` has to satisfy for the engine to behave.
+   */
+  it('holds at a freshly reached level, because the evidence resets with it', () => {
+    const justPromoted = { ...ready, sessionsAtLevel: 0, recentDifficulty: [], recentPain: [], daysAtLevel: 0 };
+    const r = decideProgression(3, justPromoted);
+    expect(r.decision).toBe('hold');
+    expect(r.toLevel).toBe(3);
+  });
+
+  it('does not promote twice on the same sessions', () => {
+    // Enough evidence to leave level 2.
+    const first = decideProgression(2, ready);
+    expect(first.decision).toBe('progress');
+    expect(first.toLevel).toBe(3);
+
+    // The counters restart at the new level, so the very next evaluation holds
+    // rather than handing an advanced session to someone two levels below it.
+    const second = decideProgression(first.toLevel, {
+      ...ready,
+      sessionsAtLevel: 0,
+      recentDifficulty: [],
+      recentPain: [],
+      daysAtLevel: 0,
+    });
+    expect(second.decision).toBe('hold');
+    expect(second.toLevel).toBe(3);
   });
 
   it('never pushes past the top level', () => {

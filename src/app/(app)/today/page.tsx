@@ -3,7 +3,9 @@ import { ArrowRight, UtensilsCrossed } from 'lucide-react';
 import { ConfidenceTag, EmptyState, Panel, Rail, Ring, Section, Stat, Why } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { SleepEntry, WaterEntry } from '@/components/quick-entry';
+import { NextStepCard } from '@/components/next-step';
 import { getDayView } from '@/lib/data/day';
+import { getNextStep } from '@/lib/data/next-step';
 import { greeting } from '@/lib/greeting';
 import { stepsToMinutes } from '@/lib/engines/steps';
 
@@ -25,7 +27,7 @@ export const metadata = { title: 'Today — FitCoach' };
  * layout with wider cards.
  */
 export default async function TodayPage() {
-  const day = await getDayView();
+  const [day, step] = await Promise.all([getDayView(), getNextStep()]);
 
   const stepsShort = day.stepsToday === null ? null : Math.max(0, day.stepTarget - day.stepsToday);
 
@@ -41,7 +43,9 @@ export default async function TodayPage() {
       : stepsShort > 0
         ? `${stepsShort.toLocaleString()} more steps — about ${stepsToMinutes(stepsShort)} minutes of walking.`
         : 'Step goal met.',
-    'Your strength session, or move it to tomorrow if today has gone.',
+    step.isRestDay
+      ? 'Rest day. Adaptation happens between sessions, so this one is on the plan.'
+      : `${step.sessionTitle} — or move it to tomorrow if today has gone.`,
     'Wind down in time to hit your sleep target.',
   ];
 
@@ -165,6 +169,10 @@ export default async function TodayPage() {
               ) : null}
             </Section>
           </Panel>
+
+          {/* Today's movement, chosen rather than fixed. Compact here — the
+              full session, with demonstrations, lives on Activity. */}
+          <NextStepCard step={step} minutes={step.sessionMinutes} compact />
 
           {/* Numbering is justified here: this is a genuine priority order, not
               decoration. Item one matters more than item four. */}

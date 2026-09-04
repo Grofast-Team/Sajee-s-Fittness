@@ -159,6 +159,16 @@ export interface ProgressionSignals {
   recentPain: ('none' | 'mild_discomfort' | 'pain')[];
   /** Share of planned sessions completed, 0-1. */
   consistency: number;
+  /**
+   * How many sessions were actually planned in the window.
+   *
+   * Without this, a consistency of 0 is ambiguous: it could mean someone
+   * skipped everything, or that nothing was scheduled yet. Reporting the second
+   * case as "0% of planned sessions done" accuses someone of missing sessions
+   * that never existed — which is exactly the kind of unearned blame this
+   * product refuses to hand out.
+   */
+  plannedSessions?: number;
   /** Days since the level last changed. */
   daysAtLevel: number;
   /** Withheld capabilities from the safety layer. */
@@ -211,7 +221,10 @@ export function checkReadiness(signals: ProgressionSignals): ReadinessCheck {
     {
       label: 'Consistency',
       passed: signals.consistency >= 0.6,
-      detail: `${Math.round(signals.consistency * 100)}% of planned sessions done.`,
+      detail:
+        signals.plannedSessions === 0
+          ? 'Nothing scheduled at this level yet — this fills in as sessions are planned.'
+          : `${Math.round(signals.consistency * 100)}% of planned sessions done.`,
     },
     {
       label: 'Time at this level',

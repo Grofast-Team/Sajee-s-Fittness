@@ -107,39 +107,34 @@ export function WeekPlan({ week, canSave }: { week: WeekView; canSave: boolean }
           title={`Today: ${today.label}`}
           meta={today.plannedMinutes ? `${today.plannedMinutes} min` : undefined}
         >
-          <div className="flex flex-wrap gap-2">
-            <Button
-              disabled={!canSave || (pending && busyId === today.id)}
-              onClick={() =>
-                today.id &&
-                run(today.id, {
-                  id: today.id,
-                  status: 'completed',
-                  actualMinutes: today.plannedMinutes ?? undefined,
-                })
-              }
-            >
-              {pending && busyId === today.id ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" aria-hidden /> Saving…
-                </>
-              ) : (
-                <>
-                  <Check size={18} aria-hidden /> Mark as done
-                </>
-              )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              disabled={!canSave || pending}
-              onClick={() =>
-                today.id && run(today.id, { id: today.id, status: 'partial', actualMinutes: 10 })
-              }
-            >
-              I did some of it
-            </Button>
-          </div>
+          {/*
+           * Completing today goes through the feedback form, not a bare
+           * "Mark as done".
+           *
+           * Two reasons this stopped being a pair of buttons here. A plain
+           * completion records no difficulty and no pain, so a user who always
+           * pressed it would starve the progression engine of the only signal
+           * it runs on — the plan would never adapt and nobody would know why.
+           * And "I did some of it" wrote a hardcoded ten minutes, which is a
+           * number nobody measured.
+           *
+           * One route to done, and it always captures the signal.
+           */}
+          <p className="measure text-sm leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
+            Finished it, or some of it? Record how it went — that rating is what decides your next
+            session.
+          </p>
+          <a
+            href="#how-did-it-go"
+            className="mt-3 inline-flex min-h-11 items-center gap-2 px-4 text-sm font-medium transition-opacity duration-200 hover:opacity-90"
+            style={{
+              background: 'var(--primary)',
+              color: 'var(--on-primary)',
+              borderRadius: 'var(--radius-control)',
+            }}
+          >
+            <Check size={16} aria-hidden /> Record how it went
+          </a>
 
           {!canSave ? (
             <p className="mt-2 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
@@ -231,7 +226,11 @@ function MissedPanel({
         <Button
           variant="ghost"
           disabled={!canSave || busy}
-          onClick={() => onAction({ id: session.id!, status: 'partial', actualMinutes: 10 })}
+          /* No `actualMinutes` here. It used to write a flat 10, which is a
+             duration nobody measured — and it would then be read back as if it
+             were recorded fact. Marking it partial is the honest claim; the
+             real length is captured by the feedback form if the user gives it. */
+          onClick={() => onAction({ id: session.id!, status: 'partial' })}
         >
           Do a short version today
         </Button>
