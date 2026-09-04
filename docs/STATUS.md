@@ -65,7 +65,7 @@ Live verification performed:
 | Weight and waist entry (`logMeasurement`) | **Done** — one row per day, upserted |
 | Step entry (`logSteps`) | **Done** — source recorded, device beats manual |
 | Water entry (`logWater`) | **Done** — one tap per glass, optimistic with rollback |
-| Sleep entry (`logSleep`) | **Action written, no UI yet** |
+| Sleep entry (`logSleep`) | **Done** — `SleepEntry` on Today takes hours and quality, so `daily_logs.sleep_minutes` is populated and the adherence engine's sleep component scores from real data |
 | Running adaptation on a schedule | **Not built** |
 
 ## Phase 3 — Food
@@ -158,28 +158,28 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
 
 ## Suggested next order of work
 
-1. **Run the whole loop against a live Supabase project.** Sign up, complete
-   setup, log a food, see it on the dashboard. Every piece of that path is
-   written and typechecks, but it has only been exercised in sample mode — no
-   Supabase project was available in this environment. Until someone runs it,
-   treat the write paths as unproven.
-2. **Sleep entry UI.** `logSleep` exists but nothing calls it, so
-   `daily_logs.sleep_minutes` stays null and the adherence engine's sleep
-   component always scores zero for real users.
-3. **Curate the video library.** `videos` is empty and `review_status` defaults
+1. **Curate the video library.** `videos` is empty and `review_status` defaults
    to `pending`, so `video-recommendation.ts` has nothing approved to return.
    The engine, the metadata and the review gate are all built; only the content
    is missing.
-4. **Scheduled adaptation.** The adapt engine is built and tested but nothing
+2. **Scheduled adaptation.** The adapt engine is built and tested but nothing
    runs it weekly, so intake and step targets never actually change.
    `progression.ts` owns the training lever separately, and does run.
-5. Verify the seed nutrition data.
-6. Coach chat endpoint.
-7. Test the photo pipeline against real scale photographs.
-8. Deprecate `workout_plans.rpe`. `session_feedback.difficulty` is now the
+3. Verify the seed nutrition data.
+4. Coach chat endpoint.
+5. Test the photo pipeline against real scale photographs.
+6. Deprecate `workout_plans.rpe`. `session_feedback.difficulty` is now the
    source of truth for how hard a session was, and `rpe` cannot distinguish
    "hard" from "hurts". It is unwritten but still present, so a future
    contributor may reasonably assume it is the column to use.
+
+Three items have left this list. Workout completion and difficulty capture
+both shipped. Sleep entry was listed as having no UI long after `SleepEntry`
+was rendering on Today and calling `logSleep` — and "run the whole loop
+against a live project" sat at number one while the verification list at the
+top of this file described that exact run. Both had been wrong for a while,
+which is worth noting in a document whose only job is to be accurate: a stale
+next-steps list sends people to build things that already exist.
 
 Two items used to head this list and no longer do. Workout completion: the week
 grid persists, so `workout_adherence` is computed from real rows. Difficulty
