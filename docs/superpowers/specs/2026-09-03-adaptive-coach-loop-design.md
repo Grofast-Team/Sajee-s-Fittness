@@ -105,19 +105,26 @@ migration puts it well: *"Pain is kept separate from difficulty on purpose.
 distinction."* Add a comment marking `workout_plans.rpe` deprecated in favour
 of `session_feedback.difficulty`.
 
-**Three buttons on session completion**, not a 1–5 slider:
+**Four buttons on session completion**, not a 1–5 slider:
 
 | Button | `session_feedback.difficulty` |
 | --- | --- |
-| Easier than expected | 2 |
+| Easy | 2 |
 | About right | 3 |
 | Hard | 4 |
+| Too hard to finish | 5 |
 
-The scale's endpoints (1 "easy", 5 "too difficult") are deliberately not
-reachable from these buttons. A beginner rating their own effort will not
-distinguish five levels reliably, and a scale whose extremes are unused is
-better than one whose values are noise. The ends remain available to later
-affordances and to derivation from `completed_ratio`.
+**The top of the scale must be reachable, and this is not a cosmetic choice.**
+`decideProgression()` in `src/lib/engines/progression.ts` regresses a level only
+on two consecutive ratings of 5. A three-button design capping at 4 would leave
+that branch permanently dead — the engine would be able to promote a user and
+never demote one, which is the failure mode that matters most for someone who
+has been over-levelled.
+
+Value 1 ("easy") stays unreachable. Four post-session buttons is already at the
+limit of what someone will answer honestly, and the distinction between "easy"
+and "very easy" changes no decision: `checkReadiness()` gates progression on an
+average at or below 3, which "Easy" at 2 already clears.
 
 **Pain is a second, separate control**, defaulting to `none`. It is not a
 difficulty value and must never be folded into one.
@@ -245,107 +252,88 @@ sample data.
 
 ---
 
-## Phase 2 — A training lever for `adapt()`
+## Phase 2 — Run the two engines that already exist
 
-### Why the engine changes before the cron
+### Correction to an earlier draft of this spec
 
-The roadmap frames this as scheduling. It is not. `AdaptationDecision` today
-offers only `hold`, `increase_intake`, `reduce_intake`, `increase_steps`,
-`reduce_activity`, `fix_logging`, `investigate_adherence`, `refer_professional`
-and `insufficient_data`.
-
-There is **no training lever at all**. `workoutAdherence` enters
-`AdaptationInput` only as a gate — a reason to withhold a calorie change — and
-is never acted on. "Increase difficulty" and "shorten 30-minute sessions to 20"
-are new decisions requiring new logic. Scheduling an unchanged `adapt()` would
-run a cron that can never adjust training.
-
-### New decisions
-
-Add `increase_training_load` and `reduce_training_load`, and a `training`
-value for `AdaptationResult.lever`.
-
-### New input
+An earlier version of this section specified adding `increase_training_load`
+and `reduce_training_load` decisions to `adapt()`. **That work is already done,
+in a different and better place.** `src/lib/engines/progression.ts` — landing
+alongside this spec, tested, green — exports `checkReadiness()` and
+`decideProgression()`, consuming exactly the columns Phase 0 writes:
 
 ```ts
-training?: {
-  sessionsPlanned: number;
-  sessionsCompleted: number;
-  /** Median session_feedback.difficulty in the window. Null when too few. */
-  medianDifficulty: number | null;
-  feedbackCount: number;
-  /** Any session_feedback.pain = 'pain' in the window. */
-  painReported: boolean;
-  medianPlannedMinutes: number;
-  medianActualMinutes: number | null;
+interface ProgressionSignals {
+  sessionsAtLevel: number;
+  recentDifficulty: number[];                            // session_feedback.difficulty
+  recentPain: ('none' | 'mild_discomfort' | 'pain')[];   // session_feedback.pain
+  consistency: number;
+  daysAtLevel: number;
+  restrictions?: string[];
 }
 ```
 
-Optional, because a user who never rates a session must still get intake
-adaptation.
+Duplicating that logic inside `adapt()` would leave two engines deciding
+training load from the same table with different thresholds. **`adapt()` keeps
+energy and steps. `progression.ts` owns training.** Neither is extended.
 
-### Rules
+### What Phase 2 actually builds
 
-Every existing invariant is preserved. They are not incidental — each exists to
-stop the engine chasing noise.
+An orchestrator, not an engine. `/api/cron/adapt`, weekly, via Vercel Cron:
 
-1. **One lever per run.** Energy *or* steps *or* training, never two. Already
-   the module's design; the training lever must not become an exception.
-2. **Shared 14-day cooldown** (`MIN_DAYS_BETWEEN_CHANGES`). Training adaptation
-   is not exempt.
-3. **Increase only when** completion is at least 80% of planned sessions
-   **and** `medianDifficulty <= 2` **and** `feedbackCount >= 6`. Fewer than six
-   ratings is insufficient evidence — the same principle as `MIN_WEIGH_INS`.
+1. Read the window's weigh-ins, logging completeness, step and workout
+   adherence, and `session_feedback` rows.
+2. Call `adapt()` for the energy and step decision.
+3. Call `decideProgression()` for the training decision.
+4. Apply **at most one** of the two, by the precedence below.
+5. Write a new `plans` version if anything changed; otherwise write nothing.
 
-   The threshold interacts deliberately with the 2 / 3 / 4 button mapping in
-   Phase 0. Since "About right" stores 3, a median at or below 2 requires a
-   majority of "Easier than expected" answers. That is the intent: load
-   increases only when the user is actually reporting the work as easy, not
-   merely when they are tolerating it. Do not "correct" this threshold to 3
-   without re-deciding the mapping.
-4. **When adherence is poor, shorten before dropping frequency.** If misses
-   concentrate on longer sessions, reduce session minutes first. Dropping a
-   training day is a larger, harder-to-reverse change, and the habit is worth
-   more than the session length. This mirrors the existing UI rule in
-   `week-plan.tsx` that there is no "double session to catch up".
-5. **Caps.** Five minutes per adjustment, or one step along the exercise
-   progression chain. Never both.
+### Precedence between the two engines
 
-   These act on different rows, and the distinction must not be blurred.
-   Duration changes write `plans.session_minutes`, which flows into
-   `planned_minutes` on sessions generated thereafter. Difficulty changes
-   substitute a single exercise for its neighbour on the chain when
-   `buildWeek()` next generates a session — they do **not** rewrite the shared
-   `workouts` templates, which are `is_public` reference data used by every
-   user.
-6. **Pain overrides everything except the referral flag.** Any
-   `session_feedback.pain = 'pain'` in the window **vetoes an increase
-   outright** and is sufficient on its own to trigger `reduce_training_load`,
-   regardless of adherence or difficulty ratings. Someone reporting pain while
-   dutifully completing every session is the exact case a
-   completion-rate-driven engine would otherwise reward with more load.
+`adapt()` already enforces one lever per run internally. The orchestrator must
+enforce the same discipline *between* the engines, because a user told in one
+week that their calories are dropping **and** their workouts are getting harder
+has been handed two variables to fail at and no way to attribute the result.
 
-   This is the one place rule 1 needs a stated precedence. When a pain report
-   and an energy adjustment both qualify in the same run, **the pain-driven
-   training reduction wins and the energy lever holds until the next window.**
-   The engine still changes exactly one thing; this says which one.
-7. **Safety restrictions veto increases.** `restrictionsFrom()` in `safety.ts`
-   already produces the withheld-capability list; an open restriction on
-   high-intensity training blocks any increase, and `hasReferralFlag` blocks
-   the whole run as it does today.
+The order is fixed:
+
+1. **`hasReferralFlag`** — nothing runs. Existing `adapt()` behaviour.
+2. **`decideProgression()` returns `hold_for_pain` or `regress`** — apply it,
+   and hold the energy lever until the next window. Someone reporting pain
+   while completing every session is exactly who a consistency-driven system
+   would otherwise reward with more load; a calorie cut in the same week
+   compounds it.
+3. **Otherwise `adapt()`'s decision**, when it is not `hold`.
+4. **Otherwise `decideProgression()`'s `progress`**, if any.
+
+Progression sits last among the non-pain branches deliberately. Adding
+difficulty is the most reversible of these changes and the least urgent.
+
+### Thresholds belong to the engines, not to this document
+
+`progression.ts` sets `MIN_SESSIONS_BEFORE_PROGRESSING = 4` and
+`MIN_DAYS_AT_LEVEL = 10`, and gates progression on a recent difficulty average
+at or below 3. `adapt()` sets `MIN_DAYS_BETWEEN_CHANGES = 14`,
+`MIN_WEIGH_INS = 10` and `MAX_ADJUSTMENT_FRACTION = 0.08`. **The orchestrator
+imposes no thresholds of its own** and must not re-derive or override them.
+They are tested where they live.
+
+The two cadences differ on purpose: training can move on ten days of evidence,
+energy needs fourteen days and ten weigh-ins, because bodyweight is the noisier
+signal. A weekly orchestrator changes neither — each engine declines on its own
+terms when asked too early.
 
 ### Progression is an addressable chain
 
 `20260903120001` settled this better than a global ladder would have.
 `exercises.level` (1–5) plus `movement_pattern`, alongside the pre-existing
-`easier_variant` / `harder_variant` pointers, means the engine can ask for "the
-level-3 horizontal push" directly instead of walking pointers one at a time —
-while still keeping progression **per movement pattern**.
+`easier_variant` / `harder_variant` pointers, means a session can be built by
+asking for "the level-3 horizontal push" directly instead of walking pointers
+one at a time — while keeping progression **per movement pattern**.
 
-That distinction is the point. A user can be ready to progress on squats and
-not on push-ups; `profiles.fitness_level` cannot express that and is not used
-for this decision. It describes the person, for choosing a video; the chain
-decides the movement.
+`profiles.fitness_level` (1–4) is what `decideProgression()` moves. The
+exercise chain is what a session is built from. They are different scales; see
+the table near the top of this document.
 
 ### Scheduling
 
@@ -357,20 +345,12 @@ decides the movement.
 the previous one; `daysSinceLastChange` is derived from the active row's
 `created_at`. The schema anticipated this.
 
-One small migration is needed. `plans` stores `training_days` but not session
-length, so a duration adjustment has nowhere to persist:
-
-```sql
--- 20260903120003_plan_session_minutes.sql
--- Follows 20260903120002_seed_progressions.sql in the ordered sequence.
-alter table public.plans
-  add column session_minutes smallint
-    check (session_minutes between 5 and 180);
-```
-
-No `training_level` column: `profiles.fitness_level` already carries the
-person's level, and duplicating it on `plans` would create a second scale to
-keep in sync.
+**No migration is required either.** An earlier draft proposed
+`plans.session_minutes` to persist a duration adjustment. It has no consumer:
+`decideProgression()` moves `profiles.fitness_level`, not session length, and
+session length already has a home in `lifestyle.session_minutes_available`,
+which `buildWeek()` reads. Adding a third place to record the same thing would
+be exactly the drift Phase 0 refuses for `rpe`.
 
 The cron must be idempotent per user per week: a retry after a partial failure
 must not write a second plan version, and must not be able to stack two
@@ -393,12 +373,16 @@ Required coverage:
 - `time_boxed_workout` excludes high-impact and non-apartment-friendly work
   when the user's context rules it out.
 - Safety interception replaces the model's reply, and is not merely appended.
-- Training lever: the increase gate, the feedback-count gate,
-  shorten-before-dropping, the five-minute cap, the safety veto, and the
-  one-lever-per-run invariant.
-- **Pain veto: a window with full adherence, `medianDifficulty` 2, and one
-  pain report must not increase load.** This is the test most worth writing
-  first, because every other signal in that scenario argues for progression.
+- Orchestrator precedence: each of the four branches selected in isolation,
+  and the case where `adapt()` and `decideProgression()` both want to act —
+  exactly one change is applied.
+- **Pain precedence end to end: a window with full adherence and one pain
+  report must apply the progression hold and leave the energy target
+  untouched.** This is the test most worth writing first, because every other
+  signal in that scenario argues for a change.
+- Round trip from the Phase 0 buttons: four "Too hard to finish" ratings must
+  reach `decideProgression()` as two consecutive 5s and produce `regress`.
+  This is what proves the button mapping and the engine agree.
 - Cron idempotency: a second run inside the cooldown changes nothing.
 - RLS isolation extended to `fitness_assessments`, `session_feedback` and
   `skill_unlocks`.
@@ -428,8 +412,8 @@ been run:
    writing `session_feedback`, the `week-plan.tsx:66` fix, STATUS.md correction.
 2. Phase 1 — intent handlers, `/api/coach`, client wiring, five live chips and
    one honest `<Unavailable>`.
-3. Phase 2 — training lever in `adapt()`, the `plans.session_minutes`
-   migration, then `/api/cron/adapt`.
+3. Phase 2 — the `/api/cron/adapt` orchestrator over the existing `adapt()`
+   and `decideProgression()`. No engine changes, no migration.
 
 Video recommendation and the fitness assessment are re-planned after Phase 2 is
 running, against real adaptation data and a curated library that does not yet
