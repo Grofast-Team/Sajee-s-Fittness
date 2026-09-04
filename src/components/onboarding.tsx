@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Check, CircleAlert, Info, Loader2 } from 'lucide-react';
-import { Button, Card, CardTitle, WhyPanel } from '@/components/ui';
+import { ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { Alert, Button, Panel, Why } from '@/components/ui';
 import { STEPS, visibleFields, type Field } from '@/lib/onboarding-steps';
 import { saveOnboarding } from '@/lib/actions/onboarding';
 import { deriveActivityLevel, estimateBmr, estimateTdee } from '@/lib/engines/energy';
@@ -17,9 +17,10 @@ type Answers = Record<string, unknown>;
 /**
  * The onboarding interview.
  *
- * Progress is saved to `localStorage` on every change, so closing the app
- * halfway through does not mean starting again. Once Supabase is configured the
- * same answers are written to `profiles`, `lifestyle` and `food_profile`.
+ * One topic per screen, never a wall of fields. Progress is saved to
+ * `localStorage` on every change, so closing the app halfway through does not
+ * mean starting again. Once Supabase is configured the same answers are written
+ * to `profiles`, `lifestyle` and `food_profile`.
  */
 const STORAGE_KEY = 'fitcoach.onboarding.v1';
 
@@ -54,64 +55,87 @@ export function Onboarding() {
     (f) => f.required && (answers[f.id] === undefined || answers[f.id] === ''),
   );
 
-  if (done) return <PlanSummary answers={answers} onEdit={() => { setDone(false); setIndex(0); }} />;
+  if (done) {
+    return (
+      <PlanSummary
+        answers={answers}
+        onEdit={() => {
+          setDone(false);
+          setIndex(0);
+        }}
+      />
+    );
+  }
+
+  const pct = ((index + 1) / STEPS.length) * 100;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span style={{ color: 'var(--fg-subtle)' }}>
-            Step {index + 1} of {STEPS.length}
+    <div>
+      <div className="pb-7 pt-2">
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <span className="text-[13px] font-medium" style={{ color: 'var(--fg-muted)' }}>
+            Step <span className="data">{index + 1}</span> of{' '}
+            <span className="data">{STEPS.length}</span>
           </span>
           {index > 0 ? (
             <button
               type="button"
               onClick={() => setIndex((i) => i - 1)}
-              className="inline-flex cursor-pointer items-center gap-1 font-medium"
-              style={{ color: 'var(--fg)' }}
+              className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-[13px] font-medium"
+              style={{ color: 'var(--primary-dark)' }}
             >
-              <ArrowLeft size={15} aria-hidden /> Back
+              <ArrowLeft size={14} aria-hidden /> Back
             </button>
           ) : null}
         </div>
+
         <div
-          className="h-1.5 w-full overflow-hidden rounded-full"
-          style={{ background: 'var(--ground)' }}
+          className="relative w-full overflow-hidden"
+          style={{ height: 8, background: 'var(--ground)', borderRadius: 8 }}
           role="progressbar"
           aria-valuenow={index + 1}
           aria-valuemin={1}
           aria-valuemax={STEPS.length}
-          aria-label={`Onboarding progress: step ${index + 1} of ${STEPS.length}`}
+          aria-label={`Setup progress: step ${index + 1} of ${STEPS.length}`}
         >
           <div
-            className="h-full rounded-full transition-[width] duration-300"
-            style={{ width: `${((index + 1) / STEPS.length) * 100}%`, background: 'var(--fg)' }}
+            className="absolute inset-y-0 left-0 transition-[width] duration-300"
+            style={{ width: `${pct}%`, background: 'var(--primary)', borderRadius: 8 }}
           />
         </div>
       </div>
 
-      <Card>
-        <h1 className="text-xl font-semibold">{step.title}</h1>
+      {/* No card. The step is the page — one question at a time is the whole
+          idea, and a box around it adds a frame with nothing to frame against. */}
+      <section>
+        <h1 className="display" style={{ fontSize: 'clamp(1.65rem, 6vw, 2rem)' }}>
+          {step.title}
+        </h1>
         {step.intro ? (
-          <p className="mt-1.5 text-sm" style={{ color: 'var(--fg-muted)' }}>
+          <p className="measure mt-3 text-[15px] leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
             {step.intro}
           </p>
         ) : null}
 
-        <div className="mt-5 space-y-5">
+        <div className="mt-8 space-y-7">
           {fields.map((field) => (
-            <FieldInput key={field.id} field={field} value={answers[field.id]} onChange={(v) => set(field.id, v)} />
+            <FieldInput
+              key={field.id}
+              field={field}
+              value={answers[field.id]}
+              onChange={(v) => set(field.id, v)}
+            />
           ))}
         </div>
-      </Card>
+      </section>
 
       {missingRequired.length > 0 ? (
-        <p className="text-center text-xs" style={{ color: 'var(--fg-subtle)' }}>
+        <p className="mt-6 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
           Still needed: {missingRequired.map((f) => f.label).join(', ')}
         </p>
       ) : null}
 
-      <div className="flex gap-2">
+      <div className="mt-6 flex gap-2">
         {index < STEPS.length - 1 ? (
           <>
             <Button
@@ -128,12 +152,42 @@ export function Onboarding() {
             </Button>
           </>
         ) : (
-          <Button className="w-full" disabled={missingRequired.length > 0} onClick={() => setDone(true)}>
+          <Button fullWidth disabled={missingRequired.length > 0} onClick={() => setDone(true)}>
             Build my plan
           </Button>
         )}
       </div>
     </div>
+  );
+}
+
+/** A selectable chip. Used for single choice, multiple choice and 1–5 scales. */
+function Chip({
+  selected,
+  onClick,
+  children,
+  className,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 border px-3.5 text-sm font-medium transition-colors duration-200 ${className ?? ''}`}
+      style={{
+        background: selected ? 'var(--primary)' : 'var(--surface)',
+        color: selected ? 'var(--on-primary)' : 'var(--fg)',
+        borderColor: selected ? 'var(--primary)' : 'var(--line-strong)',
+        borderRadius: 'var(--radius-control)',
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -146,50 +200,31 @@ function FieldInput({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const inputStyle = {
-    background: 'var(--ground)',
-    color: 'var(--fg)',
-    borderColor: 'var(--line)',
-  };
-
   return (
     <div>
       {/* Visible labels, always. Placeholder-only labels vanish the moment
           someone starts typing, which is exactly when they are needed. */}
-      <label htmlFor={field.id} className="block text-sm font-medium">
+      <label htmlFor={field.id} className="block text-[15px] font-medium">
         {field.label}
       </label>
+      {/* "Why are we asking?" sits with the question rather than in a help
+          panel somewhere else. Explaining the reason is what makes a personal
+          question feel reasonable instead of nosy. */}
       {field.because ? (
-        <p className="mt-0.5 text-xs" style={{ color: 'var(--fg-subtle)' }}>
+        <p className="mt-1 text-[13px]" style={{ color: 'var(--fg-muted)' }}>
           {field.because}
         </p>
       ) : null}
 
-      <div className="mt-2">
+      <div className="mt-2.5">
         {field.type === 'choice' ? (
           <div className="flex flex-wrap gap-2">
-            {field.options?.map((o) => {
-              const selected = value === o.value;
-              return (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => onChange(o.value)}
-                  aria-pressed={selected}
-                  className="min-h-11 cursor-pointer rounded-md border px-3 text-sm font-medium transition-colors duration-200"
-                  style={{
-                    background: selected ? 'var(--fg)' : 'var(--ground)',
-                    color: selected ? 'var(--bg)' : 'var(--fg)',
-                    borderColor: selected ? 'var(--fg)' : 'var(--line)',
-                  }}
-                >
-                  {o.label}
-                  {o.hint ? (
-                    <span className="ml-1.5 text-xs opacity-80">({o.hint})</span>
-                  ) : null}
-                </button>
-              );
-            })}
+            {field.options?.map((o) => (
+              <Chip key={o.value} selected={value === o.value} onClick={() => onChange(o.value)}>
+                {o.label}
+                {o.hint ? <span className="text-[13px] opacity-75">({o.hint})</span> : null}
+              </Chip>
+            ))}
           </div>
         ) : field.type === 'multi' ? (
           <div className="flex flex-wrap gap-2">
@@ -197,43 +232,30 @@ function FieldInput({
               const list = Array.isArray(value) ? (value as string[]) : [];
               const selected = list.includes(o.value);
               return (
-                <button
+                <Chip
                   key={o.value}
-                  type="button"
-                  aria-pressed={selected}
+                  selected={selected}
                   onClick={() =>
                     onChange(selected ? list.filter((v) => v !== o.value) : [...list, o.value])
                   }
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors duration-200"
-                  style={{
-                    background: selected ? 'var(--fg)' : 'var(--ground)',
-                    color: selected ? 'var(--bg)' : 'var(--fg)',
-                    borderColor: selected ? 'var(--fg)' : 'var(--line)',
-                  }}
                 >
                   {selected ? <Check size={14} aria-hidden /> : null}
                   {o.label}
-                </button>
+                </Chip>
               );
             })}
           </div>
         ) : field.type === 'scale' ? (
           <div className="flex gap-2">
             {[1, 2, 3, 4, 5].map((n) => (
-              <button
+              <Chip
                 key={n}
-                type="button"
-                aria-pressed={value === n}
+                selected={value === n}
                 onClick={() => onChange(n)}
-                className="min-h-11 flex-1 cursor-pointer rounded-md border text-sm font-semibold transition-colors duration-200"
-                style={{
-                  background: value === n ? 'var(--fg)' : 'var(--ground)',
-                  color: value === n ? 'var(--bg)' : 'var(--fg)',
-                  borderColor: value === n ? 'var(--fg)' : 'var(--line)',
-                }}
+                className="flex-1 font-semibold"
               >
                 {n}
-              </button>
+              </Chip>
             ))}
           </div>
         ) : (
@@ -247,10 +269,17 @@ function FieldInput({
               placeholder={field.placeholder}
               value={(value as string | number | undefined) ?? ''}
               onChange={(e) =>
-                onChange(field.type === 'number' ? Number(e.target.value) || undefined : e.target.value)
+                onChange(
+                  field.type === 'number' ? Number(e.target.value) || undefined : e.target.value,
+                )
               }
-              className="min-h-11 w-full rounded-md border px-3 text-base"
-              style={inputStyle}
+              className="min-h-11 w-full border px-3 text-[15px] outline-none"
+              style={{
+                background: 'var(--surface)',
+                color: 'var(--fg)',
+                borderColor: 'var(--line-strong)',
+                borderRadius: 'var(--radius-control)',
+              }}
             />
             {field.unit ? (
               <span className="shrink-0 text-sm" style={{ color: 'var(--fg-subtle)' }}>
@@ -352,9 +381,9 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
 
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-semibold">Your starting plan</h1>
-        <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
+      <header className="pb-2">
+        <h1 className="display text-[1.75rem] md:text-[2rem]">Your starting plan</h1>
+        <p className="measure mt-2 text-[15px] leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
           Built from your answers. These are starting points, not verdicts — we will adjust them
           from what actually happens over the next few weeks.
         </p>
@@ -362,22 +391,14 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
 
       {/* Safety notes come first, above the plan they constrain. */}
       {referrals.map((flag) => (
-        <Card key={flag.code} className="border-dashed">
-          <div className="flex gap-2.5">
-            <CircleAlert size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--signal)' }} aria-hidden />
-            <div>
-              <p className="text-sm font-semibold">{flag.reason}</p>
-              <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
-                {flag.guidance}
-              </p>
-            </div>
-          </div>
-        </Card>
+        <Alert key={flag.code} tone="warning" title={flag.reason}>
+          {flag.guidance}
+        </Alert>
       ))}
 
-      <Card>
-        <CardTitle>Every day</CardTitle>
-        <dl className="space-y-2.5">
+      <Panel feature>
+        <h2 className="mb-4 text-[17px] font-semibold">Every day</h2>
+        <dl className="space-y-3">
           {[
             ['Energy', `${plan.energy.targetKcal.toLocaleString()} kcal`],
             ['Protein', `${plan.macros.proteinG} g`],
@@ -387,7 +408,11 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
             ['Training', `${Number(answers.trainingDays) || 2} days a week`],
             ['Sleep', `${Number(answers.sleepHours) || 7.5} hours`],
           ].map(([k, v]) => (
-            <div key={k} className="flex items-baseline justify-between gap-4">
+            <div
+              key={k}
+              className="flex items-baseline justify-between gap-4 border-b pb-3 last:border-0 last:pb-0"
+              style={{ borderColor: 'var(--line)' }}
+            >
               <dt className="text-sm" style={{ color: 'var(--fg-muted)' }}>
                 {k}
               </dt>
@@ -396,7 +421,7 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
           ))}
         </dl>
 
-        <WhyPanel label="Where did these come from?">
+        <Why label="Where did these come from?">
           <p>{plan.energy.explanation}</p>
           <ul className="mt-2 list-disc space-y-0.5 pl-5">
             {plan.activity.reasons.map((r) => (
@@ -404,12 +429,12 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
             ))}
           </ul>
           <p className="mt-2">{plan.steps.explanation}</p>
-        </WhyPanel>
-      </Card>
+        </Why>
+      </Panel>
 
-      <Card>
-        <CardTitle>What we will not do</CardTitle>
-        <ul className="space-y-1.5 text-sm" style={{ color: 'var(--fg-muted)' }}>
+      <Panel>
+        <h2 className="mb-3 text-[15px] font-semibold">What we will not do</h2>
+        <ul className="space-y-2 text-sm" style={{ color: 'var(--fg-muted)' }}>
           {[
             `Take you below ${plan.energy.floorKcal.toLocaleString()} kcal. That floor is enforced in code, not just policy.`,
             'Tell you to fast or train extra to make up for a heavy meal.',
@@ -417,31 +442,22 @@ function PlanSummary({ answers, onEdit }: { answers: Answers; onEdit: () => void
             'Ban foods you like. Portions change; the food stays.',
             'Pretend a photo can tell us exactly how much you ate.',
           ].map((s) => (
-            <li key={s} className="flex gap-2">
-              <span aria-hidden>·</span>
+            <li key={s} className="flex gap-2.5">
+              <span aria-hidden style={{ color: 'var(--fg-subtle)' }}>
+                —
+              </span>
               <span>{s}</span>
             </li>
           ))}
         </ul>
-      </Card>
+      </Panel>
 
-      <div
-        className="flex items-start gap-2.5 rounded-md p-3 text-sm"
-        style={{ background: 'var(--ground)' }}
-      >
-        <Info size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--fg)' }} aria-hidden />
-        <p>
-          This is general wellness guidance, not medical advice, and it is not a substitute for a
-          doctor or a registered dietitian.
-        </p>
-      </div>
+      <Alert tone="info">
+        This is general wellness guidance, not medical advice, and it is not a substitute for a
+        doctor or a registered dietitian.
+      </Alert>
 
-      {saveError ? (
-        <p role="alert" className="flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
-          <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
-          {saveError}
-        </p>
-      ) : null}
+      {saveError ? <Alert tone="error">{saveError}</Alert> : null}
 
       <div className="flex gap-2">
         <Button className="flex-1" disabled={saving} onClick={handleStart}>

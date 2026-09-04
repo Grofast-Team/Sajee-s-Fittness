@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { CircleAlert, Trash2 } from 'lucide-react';
-import { ConfidenceTag } from '@/components/ui';
+import { Trash2, UtensilsCrossed } from 'lucide-react';
+import { Alert, Button, ConfidenceTag, EmptyState } from '@/components/ui';
 import { deleteFoodLog } from '@/lib/actions/food';
 import type { LoggedItem } from '@/lib/data/day';
 
@@ -22,32 +22,32 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
 
   if (items.length === 0) {
     return (
-      <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-          Nothing logged yet today. Start with whatever you ate last — it does not have to be
-        perfect, and a rough entry beats no entry.
-      </p>
+      <EmptyState
+        icon={<UtensilsCrossed size={22} aria-hidden />}
+        title="Nothing logged yet today"
+        detail="Start with whatever you ate last. It does not have to be perfect — a rough entry beats no entry."
+      />
     );
   }
 
   return (
     <div>
       {error ? (
-        <p role="alert" className="mb-3 flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
-          <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
-          {error}
-        </p>
+        <div className="mb-3">
+          <Alert tone="error">{error}</Alert>
+        </div>
       ) : null}
 
       <ul className="divide-y">
         {items.map((entry) => (
-          <li key={entry.id} className="py-2.5 first:pt-0">
+          <li key={entry.id} className="py-3 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium">{entry.meal}</p>
-                <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
+                <p className="text-sm font-semibold">{entry.meal}</p>
+                <p className="mt-0.5 text-sm" style={{ color: 'var(--fg-muted)' }}>
                   {entry.description}
                 </p>
-                <div className="mt-1">
+                <div className="mt-1.5">
                   <ConfidenceTag level={entry.confidence} />
                 </div>
               </div>
@@ -60,7 +60,7 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                       ? `${entry.kcalLow}–${entry.kcalHigh} kcal`
                       : `${entry.kcal} kcal`}
                   </p>
-                  <p className="data text-xs" style={{ color: 'var(--fg-subtle)' }}>
+                  <p className="data text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
                     {entry.proteinG} g protein
                   </p>
                 </div>
@@ -74,7 +74,7 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                     }}
                     aria-label={`Remove ${entry.description}`}
                     aria-expanded={confirming === entry.id}
-                    className="flex size-11 cursor-pointer items-center justify-center rounded-md transition-colors duration-200"
+                    className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] transition-colors duration-200"
                     style={{ color: 'var(--fg-subtle)' }}
                   >
                     <Trash2 size={16} aria-hidden />
@@ -87,12 +87,13 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                 you are about to remove visible while you decide. */}
             {confirming === entry.id ? (
               <div
-                className="mt-2 flex flex-wrap items-center gap-2 rounded-md p-3"
-                style={{ background: 'var(--ground)' }}
+                className="mt-3 flex flex-wrap items-center gap-2 p-3"
+                style={{ background: 'var(--bg)', borderRadius: 'var(--radius-control)' }}
               >
                 <span className="flex-1 text-sm">Remove this entry?</span>
-                <button
-                  type="button"
+                <Button
+                  variant="danger"
+                  size="sm"
                   disabled={pending}
                   onClick={() =>
                     startTransition(async () => {
@@ -101,19 +102,12 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                       setConfirming(null);
                     })
                   }
-                  className="min-h-11 cursor-pointer rounded-md px-3 text-sm font-semibold"
-                  style={{ background: 'var(--alarm)', color: '#ffffff' }}
                 >
                   {pending ? 'Removing…' : 'Remove'}
-                </button>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => setConfirming(null)}
-                  className="min-h-11 cursor-pointer rounded-md px-3 text-sm font-medium"
-                >
+                </Button>
+                <Button variant="quiet" size="sm" disabled={pending} onClick={() => setConfirming(null)}>
                   Keep
-                </button>
+                </Button>
               </div>
             ) : null}
           </li>

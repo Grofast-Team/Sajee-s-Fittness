@@ -7,96 +7,116 @@ invent a calorie count from a photo. It shows a range when it does not know. It
 says "too early to tell" rather than drawing a trend line through noise. It
 separates what was *weighed* from what was *guessed*.
 
-That belief should be visible in the interface, not just in the copy. So the
-design encodes it structurally: **the visual system distinguishes measured from
-estimated everywhere it appears.**
-
-That is the idea the whole thing hangs off. Everything else stays quiet.
-
-## What was wrong before
-
-The first pass was a stack of identical rounded cards — same radius, same
-padding, same border, same weight, one accent colour applied uniformly. It had
-three specific failures:
-
-1. **No hierarchy.** "1,053 / 1,750 kcal" — the number the screen exists to
-   communicate — was set at the same size as a helper caption.
-2. **No signature.** Nothing on the screen could only have come from this app.
-   Swap the words and it is any dashboard.
-3. **Colour carried no meaning.** Cyan on everything, because cyan was the brand
-   colour, not because cyan said anything.
-
-## Signature: the measurement rail
-
-Progress bars are the default answer, and a filled pill cannot express
-uncertainty — it forces a single position where the truth is a range.
-
-So every quantity in the app is drawn on a **graduated rail**: a rule with tick
-marks, like the face of a weighing scale.
-
-```
-  ENERGY                                     1,053 / 1,750 kcal
-  ┌──────────────────────────────────────────────────────────┐
-  ████████████████████████████▌ ░░░░░░░░░░
-  ╵    ╵    ╵    ╵    ╵    ╵    ╵    ╵    ╵    ╵
-```
-
-- A **measured** value ends in a solid marker on the rail.
-- An **estimated** value renders as a translucent amber band spanning the
-  uncertainty, with no marker — because there is no single point to mark.
-
-The rail is the thing you would remember, and it is the product's argument
-made visual: this app shows you the width of what it does not know.
+The interface has a second job alongside that one: it has to feel like a **calm
+personal coach**, not a bodybuilding app and not a clinical dashboard. The
+audience is a beginner who does not know nutrition, using a cheap Android phone
+while cooking or walking. Everything below serves those two things together —
+the design stays quiet so that the one moment of uncertainty stands out.
 
 ## Palette
 
-Not cyan-on-everything. Colour carries meaning here.
+Blue is the resting state. It carries progress, navigation and the primary
+action — everything that is settled. Amber carries doubt, and nothing else may
+use it.
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--ink` | `#0E1113` | base, dark mode |
-| `--paper` | `#F7F5F0` | base, light mode — warm, not clinical white |
-| `--signal` | `#E0A126` | **estimated** — turmeric. Kitchen-native, warm, honest about doubt |
-| `--confirm` | `#1F6F5C` | **measured** — deep pine. Grounded, never neon |
-| `--alarm` | `#C0442E` | safety limits and destructive actions only |
+| `--primary` | `#2563EB` | primary actions, progress, active navigation, links |
+| `--primary-dark` | `#1D4ED8` | text on light blue, hover |
+| `--primary-light` | `#EFF6FF` | active nav background, empty progress track |
+| `--bg` | `#F8FAFC` | the page |
+| `--surface` | `#FFFFFF` | cards |
+| `--fg` / `--fg-muted` / `--fg-subtle` | `#0F172A` / `#64748B` / `#94A3B8` | text |
+| `--line` | `#E2E8F0` | borders |
+| `--signal` | `#B45309` | **estimated** — moderate confidence, a range, a photo guess |
+| `--confirm` | `#047857` | **measured** — weighed, completed, target met |
+| `--alarm` | `#DC2626` | invalid input, failed save, safety limits, destructive actions |
 
-Turmeric and pine come from the subject's own world — a South Indian kitchen —
-rather than from a palette generator. Neither is a health-app cliché, and the
-pairing is warm where most fitness apps are cold and aggressive.
+The whole interface is deliberately *not* blue. White cards on a very light
+blue ground, with blue reserved for the things you can act on, is what keeps it
+from getting tiring across a day of use — and it is what lets the amber read as
+a genuine signal rather than one more colour.
 
-Deliberately avoided: cream-and-terracotta, near-black-with-acid-green, and
-medical blue. All three are defaults that appear regardless of subject.
+Dark mode exists but is not the designed experience. Light is primary; the dark
+palette is there so a phone set to dark at 11pm does not flashbang someone
+logging dinner.
+
+## Signature: the range-aware ring
+
+Progress rings are the default answer for a wellness app, and an ordinary ring
+cannot express uncertainty — it forces a single position where the truth is a
+range.
+
+This one can:
+
+- A **measured** value closes as a solid blue arc with a rounded cap.
+- An **estimated** value draws as a translucent amber band spanning the range we
+  actually believe, with no cap — because a cap implies a value landed there.
+
+That is the product's argument made visual: the app shows you the width of what
+it does not know. `Rail` carries the same distinction laid flat, for places
+where rings would crowd — four targets on a narrow phone, or a secondary metric
+beside a primary one.
+
+Rings are used sparingly. One per screen, at hero size; everything else is a
+rail. A dashboard of six competing rings communicates less than one.
 
 ## Type
 
-Three faces, three jobs.
+One family, two jobs.
 
-| Role | Face | Why |
+| Role | Treatment | Why |
 | --- | --- | --- |
-| Display | **Bricolage Grotesque** | Variable width and weight, genuine character, not the Space Grotesk everyone reaches for |
-| Body | **Inter** | Invisible workhorse. Its job is legibility on a cheap Android screen |
-| Data | **IBM Plex Mono** | Every number in the app. Tabular by nature, instrument heritage |
+| Display | Inter, weight 640, `-0.025em` | Tight tracking and heavier optical weight give headings presence without a second font download |
+| Body | Inter, 15–16px | Legibility on a cheap Android screen is the whole requirement |
+| Data | Inter with `tabular-nums` | Numbers are the content; tabular figures stop columns twitching as digits change |
 
-Numbers get their own face because **numbers are the content**. Weight, grams,
-kcal and steps all read in Plex Mono, which makes a figure recognisable as *a
-measurement* the instant you see it, and keeps columns from reflowing as digits
-change.
+A separate display face and a monospace for numbers were both removed. They
+cost two font downloads on what may be a shared 4G connection, and Inter set
+properly does both jobs. Section labels are **sentence case**, not tracked-out
+capitals — this app talks to beginners, and shouting in capitals above every
+block reads as an interface for people who already know the vocabulary.
 
-## Layout
+## Layout and responsiveness
 
-The uniform card stack is gone.
+One application with responsive layouts, never a separate mobile and desktop
+build. The same components and the same data adapt to the viewport.
 
-- **Hero, full bleed, no card.** The day opens with the single number that
-  matters, at a size nothing else competes with.
-- **The brief** is numbered — and numbering is justified here because it is a
-  genuine priority order, not decoration.
-- **Sections separate by ground shift and hairline rule**, not by giving every
-  block its own border. Cards are now reserved for things that are genuinely
-  interactive objects.
+| Width | Shape |
+| --- | --- |
+| < 768px | Compact header, one column, bottom navigation |
+| 768–1023px | Compact header, two-column grids, bottom navigation |
+| ≥ 1024px | Fixed 248px sidebar, multi-column content, no bottom bar |
+
+The sidebar and the bottom bar are never on screen together — two navigations
+competing is how a responsive app ends up feeling like two apps stitched
+together. Content stops at 1280px so text does not stretch into an unreadable
+line on a 1920px monitor. Page gutters step 16 / 24 / 32px with the viewport.
+
+Desktop is not the phone layout with wider cards. On Today, the day's decisions
+take the left column and the slower-moving picture — weight, hydration, sleep —
+takes the right. Coach keeps a single centred column at every width, because it
+is a conversation and chat stretched to 1200px is unreadable.
 
 ## Restraint
 
-One bold element: the rail. Everything around it stays quiet — hairlines, flat
-grounds, no gradients, no shadows doing decorative work, no scattered
-animation. Motion is limited to the rail settling on load and state changes at
-150–250ms, and it is disabled under `prefers-reduced-motion`.
+One bold element: the ring. Everything around it stays quiet — thin borders,
+barely-there shadows, no gradients, no decorative animation. Radius steps with
+importance rather than being one value everywhere: 10px controls, 16px cards,
+20px feature cards.
+
+Motion is limited to progress settling on load and state changes at 180–260ms,
+and everything is disabled under `prefers-reduced-motion`.
+
+## Rules that are not negotiable
+
+- **Never communicate with colour alone.** Confidence is labelled in words
+  ("Weighed", "Estimated"); alerts pair an icon with text.
+- **Never invent a number.** Missing stays missing — "not recorded", with the
+  action to fix it.
+- **Never ship a dead control.** A button that looks pressable and does nothing
+  is worse than a sentence saying the feature is not built yet.
+- **44px minimum touch target.** This gets used one-handed, walking.
+- **Labels are real elements, never placeholders.** A placeholder disappears the
+  moment someone starts typing, which is exactly when a beginner still needs it.
+- **No shame.** A missed target is a distance still to cover, never a failure.

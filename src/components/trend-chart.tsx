@@ -4,19 +4,18 @@ import type { TrendPoint } from '@/lib/engines/types';
  * Weight chart.
  *
  * Two series: the faint raw readings and the bold smoothed trend. Showing both
- * is the point - it makes visible, at a glance, that the daily scatter is noise
+ * is the point — it makes visible, at a glance, that the daily scatter is noise
  * and the line through it is the actual signal.
  *
  * Rendered as inline SVG on the server: no charting library, no client
  * JavaScript, no layout shift while a bundle loads.
+ *
+ * The chart is capped at a readable width rather than filling a desktop panel.
+ * An SVG with a viewBox scales its text along with everything else, so letting
+ * it run to 1000px would blow the axis labels up to headline size — and the
+ * same slope drawn wider reads as a gentler loss than it is.
  */
-export function TrendChart({
-  points,
-  height = 160,
-}: {
-  points: TrendPoint[];
-  height?: number;
-}) {
+export function TrendChart({ points, height = 160 }: { points: TrendPoint[]; height?: number }) {
   if (points.length < 2) {
     return (
       <p className="py-8 text-center text-sm" style={{ color: 'var(--fg-subtle)' }}>
@@ -37,8 +36,7 @@ export function TrendChart({
   const yMin = min - span * 0.15;
   const yMax = max + span * 0.15;
 
-  const x = (i: number) =>
-    pad.left + (i / (points.length - 1)) * (width - pad.left - pad.right);
+  const x = (i: number) => pad.left + (i / (points.length - 1)) * (width - pad.left - pad.right);
   const y = (v: number) =>
     pad.top + (1 - (v - yMin) / (yMax - yMin)) * (height - pad.top - pad.bottom);
 
@@ -47,7 +45,7 @@ export function TrendChart({
   const ticks = [yMax, (yMax + yMin) / 2, yMin];
 
   return (
-    <figure>
+    <figure className="mx-auto max-w-xl">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="w-full"
@@ -78,26 +76,52 @@ export function TrendChart({
 
         {/* Raw readings, deliberately de-emphasised. */}
         {points.map((p, i) => (
-          <circle key={p.date} cx={x(i)} cy={y(p.raw)} r={1.8} fill="var(--fg-subtle)" opacity={0.45} />
+          <circle
+            key={p.date}
+            cx={x(i)}
+            cy={y(p.raw)}
+            r={1.8}
+            fill="var(--fg-subtle)"
+            opacity={0.5}
+          />
         ))}
 
-        <path d={trendPath} fill="none" stroke="var(--fg)" strokeWidth={2.5} strokeLinecap="round" />
+        <path
+          d={trendPath}
+          fill="none"
+          stroke="var(--primary)"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
 
         <text x={pad.left} y={height - 4} fontSize={9} fill="var(--fg-subtle)">
           {points[0].date.slice(5)}
         </text>
-        <text x={width - pad.right} y={height - 4} textAnchor="end" fontSize={9} fill="var(--fg-subtle)">
+        <text
+          x={width - pad.right}
+          y={height - 4}
+          textAnchor="end"
+          fontSize={9}
+          fill="var(--fg-subtle)"
+        >
           {points[points.length - 1].date.slice(5)}
         </text>
       </svg>
 
-      <figcaption className="mt-1 flex items-center gap-4 text-xs" style={{ color: 'var(--fg-subtle)' }}>
+      <figcaption
+        className="mt-2 flex items-center justify-center gap-4 text-[13px]"
+        style={{ color: 'var(--fg-subtle)' }}
+      >
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-0.5 w-4 rounded" style={{ background: 'var(--fg)' }} />
+          <span className="inline-block h-0.5 w-4 rounded" style={{ background: 'var(--primary)' }} />
           Trend (kg)
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-1.5 rounded-full" style={{ background: 'var(--fg-subtle)' }} />
+          <span
+            className="inline-block size-1.5 rounded-full"
+            style={{ background: 'var(--fg-subtle)' }}
+          />
           Daily readings
         </span>
       </figcaption>

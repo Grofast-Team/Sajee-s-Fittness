@@ -1,3 +1,5 @@
+import { Alert } from '@/components/ui';
+
 /**
  * The sample-data banner.
  *
@@ -10,13 +12,10 @@ export function SampleBanner({ isSample }: { isSample: boolean }) {
   if (!isSample) return null;
 
   return (
-    <div
-      role="status"
-      className="rounded-md px-3 py-2 text-xs font-medium"
-      style={{ background: 'var(--signal-wash)', color: 'var(--signal)' }}
-    >
-      Sample profile — this is not your data. The numbers are real output from the calculation
-      engines, computed from a sample person.
+    <div role="status" className="pt-4">
+      <Alert tone="warning" title="Sample profile — this is not your data">
+        The numbers are real output from the calculation engines, computed from a sample person.
+      </Alert>
     </div>
   );
 }

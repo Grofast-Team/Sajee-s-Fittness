@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CircleAlert, CircleCheck, Loader2, Plus, Scale, Search, X } from 'lucide-react';
-import { Button, Card, CardTitle, ConfidenceBadge } from '@/components/ui';
+import { Loader2, Plus, Scale, Search, X } from 'lucide-react';
+import { Alert, Button, ConfidenceBadge, Field, inputClass, inputStyle } from '@/components/ui';
 import { resolvePortion } from '@/lib/engines/portion';
 import { estimateNutrition, type FoodDensity } from '@/lib/engines/nutrition';
 import { logFood } from '@/lib/actions/food';
@@ -27,6 +27,9 @@ interface FoodResult extends FoodDensity {
  * Nutrition is computed client-side by the same pure engine the server uses, so
  * the preview updates instantly while typing and cannot disagree with what gets
  * saved.
+ *
+ * Neither this nor the portion picker draws its own card: the Food screen
+ * supplies the panel, and a card inside a card reads as a stack of boxes.
  */
 export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
   const [saved, setSaved] = useState<string | null>(null);
@@ -87,18 +90,18 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
   }
 
   return (
-    <Card>
-      <CardTitle hint="Works without AI">Search for a food</CardTitle>
+    <div>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h3 className="text-[15px] font-semibold">Search for a food</h3>
+        <span className="text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
+          Works without AI
+        </span>
+      </div>
 
       {saved ? (
-        <p
-          role="status"
-          className="mb-3 flex items-start gap-2 text-sm"
-          style={{ color: 'var(--confirm)' }}
-        >
-          <CircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden />
-          {saved}
-        </p>
+        <div className="mb-3" role="status">
+          <Alert tone="success">{saved}</Alert>
+        </div>
       ) : null}
 
       <div className="relative">
@@ -118,8 +121,8 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="dosai, thayir, 2 idli…"
           autoComplete="off"
-          className="min-h-11 w-full rounded-md border pl-10 pr-10 text-base"
-          style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
+          className={`${inputClass} !pl-10 !pr-10`}
+          style={inputStyle}
         />
         {loading ? (
           <Loader2
@@ -131,7 +134,7 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
         ) : null}
       </div>
 
-      <p className="mt-2 text-xs" style={{ color: 'var(--fg-subtle)' }}>
+      <p className="mt-2 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
         Regional names and rough spellings both work — &ldquo;thosai&rdquo;, &ldquo;dosai&rdquo; and
         &ldquo;dosa&rdquo; all find the same food.
       </p>
@@ -143,7 +146,7 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
               <button
                 type="button"
                 onClick={() => setSelected(food)}
-                className="flex w-full min-h-14 cursor-pointer items-center justify-between gap-3 py-2.5 text-left"
+                className="flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 py-2.5 text-left"
               >
                 <span className="min-w-0">
                   <span className="block text-sm font-medium">
@@ -155,7 +158,7 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
                       </span>
                     ) : null}
                   </span>
-                  <span className="block text-xs" style={{ color: 'var(--fg-subtle)' }}>
+                  <span className="block text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
                     {food.kcalPer100g} kcal · {food.proteinPer100g} g protein per 100 g
                     {/* Raw and cooked are never interchangeable, so the state is
                         always visible rather than buried in the record. */}
@@ -164,26 +167,32 @@ export function FoodSearch({ canSave = false }: { canSave?: boolean }) {
                       : ''}
                   </span>
                 </span>
-                <Plus size={18} className="shrink-0" style={{ color: 'var(--fg)' }} aria-hidden />
+                <Plus
+                  size={18}
+                  className="shrink-0"
+                  style={{ color: 'var(--primary)' }}
+                  aria-hidden
+                />
               </button>
             </li>
           ))}
         </ul>
       ) : active && !loading ? (
-        <div className="mt-4 text-sm" style={{ color: 'var(--fg-muted)' }}>
-          <p>Nothing matched &ldquo;{query}&rdquo;.</p>
-          <Button variant="ghost" className="mt-2">
-            Add it as a custom food
-          </Button>
-        </div>
+        /* No dead "add a custom food" button here: custom foods are not built
+           yet, and a control that looks pressable but does nothing is worse
+           than saying so plainly. */
+        <p className="mt-4 text-sm" style={{ color: 'var(--fg-muted)' }}>
+          Nothing matched &ldquo;{query}&rdquo;. Try a shorter word, or the name you would use at
+          home. Adding your own foods is not built yet.
+        </p>
       ) : null}
 
       {source === 'sample' && visible.length > 0 ? (
-        <p className="mt-3 text-xs" style={{ color: 'var(--fg-subtle)' }}>
+        <p className="mt-3 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
           Searching a bundled sample of the food database. Connect Supabase for the full set.
         </p>
       ) : null}
-    </Card>
+    </div>
   );
 }
 
@@ -263,10 +272,10 @@ function PortionPicker({
   }
 
   return (
-    <Card>
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <div>
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">{food.name}</h2>
+          <h3 className="text-[15px] font-semibold">{food.name}</h3>
           {food.nameLocal ? (
             <p className="text-sm" style={{ color: 'var(--fg-subtle)' }}>
               {food.nameLocal}
@@ -277,47 +286,55 @@ function PortionPicker({
           type="button"
           onClick={onCancel}
           aria-label="Cancel"
-          className="cursor-pointer rounded-lg p-1.5"
-          style={{ background: 'var(--ground)' }}
+          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg"
+          style={{ background: 'var(--ground)', color: 'var(--fg-muted)' }}
         >
           <X size={16} aria-hidden />
         </button>
       </div>
 
-      <div className="mb-4 flex gap-1 rounded-md p-1" style={{ background: 'var(--ground)' }}>
-        <button
-          type="button"
-          onClick={() => setMode('grams')}
-          aria-pressed={mode === 'grams'}
-          className="inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-sm font-semibold"
-          style={{
-            background: mode === 'grams' ? 'var(--surface)' : 'transparent',
-            color: mode === 'grams' ? 'var(--fg)' : 'var(--fg-subtle)',
-          }}
-        >
-          <Scale size={15} aria-hidden /> Weighed
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('serving')}
-          disabled={food.servings.length === 0}
-          aria-pressed={mode === 'serving'}
-          className="min-h-10 flex-1 cursor-pointer rounded-lg text-sm font-semibold disabled:opacity-40"
-          style={{
-            background: mode === 'serving' ? 'var(--surface)' : 'transparent',
-            color: mode === 'serving' ? 'var(--fg)' : 'var(--fg-subtle)',
-          }}
-        >
-          Household measure
-        </button>
+      {/* Weighed sits first and is named for what it is. The interface should
+          make the accurate option the obvious one without shutting out the
+          person who has no scale. */}
+      <div
+        className="mb-4 flex gap-1 p-1"
+        style={{ background: 'var(--ground)', borderRadius: 'var(--radius-control)' }}
+      >
+        {(
+          [
+            { key: 'grams', label: 'Weighed', icon: true },
+            { key: 'serving', label: 'Household measure', icon: false },
+          ] as const
+        ).map((tab) => {
+          const on = mode === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setMode(tab.key)}
+              disabled={tab.key === 'serving' && food.servings.length === 0}
+              aria-pressed={on}
+              className="inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                background: on ? 'var(--surface)' : 'transparent',
+                color: on ? 'var(--primary-dark)' : 'var(--fg-muted)',
+                boxShadow: on ? 'var(--shadow-sm)' : undefined,
+              }}
+            >
+              {tab.icon ? <Scale size={15} aria-hidden /> : null}
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {mode === 'grams' ? (
-        <div>
-          <label htmlFor="grams" className="block text-sm font-medium">
-            How many grams?
-          </label>
-          <div className="mt-1.5 flex items-center gap-2">
+        <Field
+          label="How many grams?"
+          htmlFor="grams"
+          description="Weighed portions are exact. This is the accurate option."
+        >
+          <div className="flex items-center gap-2">
             <input
               id="grams"
               type="number"
@@ -326,23 +343,21 @@ function PortionPicker({
               max={5000}
               value={grams}
               onChange={(e) => setGrams(Number(e.target.value) || 0)}
-              className="min-h-11 w-full rounded-md border px-3 text-base"
-              style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
+              className={`data ${inputClass}`}
+              style={inputStyle}
             />
             <span className="shrink-0 text-sm" style={{ color: 'var(--fg-subtle)' }}>
               g
             </span>
           </div>
-          <p className="mt-1.5 text-xs" style={{ color: 'var(--fg-subtle)' }}>
-            Weighed portions are exact. This is the accurate option.
-          </p>
-        </div>
+        </Field>
       ) : (
-        <div>
-          <label htmlFor="count" className="block text-sm font-medium">
-            How many?
-          </label>
-          <div className="mt-1.5 flex gap-2">
+        <Field
+          label="How many?"
+          htmlFor="count"
+          description="Household measures vary between kitchens, so this is close rather than exact."
+        >
+          <div className="flex gap-2">
             <input
               id="count"
               type="number"
@@ -351,15 +366,15 @@ function PortionPicker({
               step={0.25}
               value={count}
               onChange={(e) => setCount(Number(e.target.value) || 0)}
-              className="min-h-11 w-20 rounded-md border px-3 text-base"
-              style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
+              className={`data ${inputClass} !w-20`}
+              style={inputStyle}
             />
             <select
               aria-label="Unit"
               value={servingIndex}
               onChange={(e) => setServingIndex(Number(e.target.value))}
-              className="min-h-11 flex-1 rounded-md border px-3 text-base"
-              style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
+              className={`${inputClass} !flex-1`}
+              style={inputStyle}
             >
               {food.servings.map((s, i) => (
                 <option key={s.unitLabel} value={i}>
@@ -368,32 +383,31 @@ function PortionPicker({
               ))}
             </select>
           </div>
-          <p className="mt-1.5 text-xs" style={{ color: 'var(--fg-subtle)' }}>
-            Household measures vary between kitchens, so this is close rather than exact.
-          </p>
-        </div>
+        </Field>
       )}
 
       <div className="mt-4">
-        <label htmlFor="meal" className="block text-sm font-medium">
-          Which meal?
-        </label>
-        <select
-          id="meal"
-          value={meal}
-          onChange={(e) => setMeal(e.target.value)}
-          className="mt-1.5 min-h-11 w-full rounded-md border px-3 text-base"
-          style={{ background: 'var(--ground)', color: 'var(--fg)', borderColor: 'var(--line)' }}
-        >
-          {MEALS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        <Field label="Which meal?" htmlFor="meal">
+          <select
+            id="meal"
+            value={meal}
+            onChange={(e) => setMeal(e.target.value)}
+            className={inputClass}
+            style={inputStyle}
+          >
+            {MEALS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </Field>
       </div>
 
-      <div className="mt-4 rounded-md p-3" style={{ background: 'var(--ground)' }}>
+      <div
+        className="mt-4 p-3.5"
+        style={{ background: 'var(--ground)', borderRadius: 'var(--radius-control)' }}
+      >
         <div className="flex items-baseline justify-between gap-3">
           <span className="data text-2xl font-semibold">{estimate.display}</span>
           <ConfidenceBadge level={estimate.confidence} />
@@ -402,20 +416,20 @@ function PortionPicker({
           {estimate.proteinG} g protein · {estimate.carbG} g carbs · {estimate.fatG} g fat
           {estimate.fibreG != null ? ` · ${estimate.fibreG} g fibre` : ''}
         </p>
-        <p className="mt-1.5 text-xs" style={{ color: 'var(--fg-subtle)' }}>
+        <p className="mt-1.5 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
           {portion.explanation}
         </p>
       </div>
 
       {error ? (
-        <p role="alert" className="mt-3 flex items-start gap-2 text-sm" style={{ color: 'var(--alarm)' }}>
-          <CircleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
-          {error}
-        </p>
+        <div className="mt-3">
+          <Alert tone="error">{error}</Alert>
+        </div>
       ) : null}
 
       <Button
-        className="mt-4 w-full"
+        className="mt-4"
+        fullWidth
         disabled={saving || !canSave || estimate.kcal <= 0}
         onClick={handleSave}
       >
@@ -429,10 +443,10 @@ function PortionPicker({
       </Button>
 
       {!canSave ? (
-        <p className="mt-2 text-center text-xs" style={{ color: 'var(--fg-subtle)' }}>
+        <p className="mt-2 text-center text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
           Sign in and finish setup to save entries to your day.
         </p>
       ) : null}
-    </Card>
+    </div>
   );
 }

@@ -48,6 +48,10 @@ export interface WaistView {
 export interface DayView {
   isSample: boolean;
   displayName: string;
+  /** IANA zone from the profile. The greeting is computed against this rather
+   *  than the server clock, so "Good evening" does not appear at 3pm for a user
+   *  in Chennai being served from a machine in Washington. */
+  timezone: string;
   weightKg: number | null;
   waist: WaistView | null;
   constraints: Constraints;
@@ -101,6 +105,7 @@ function sampleDay(): DayView {
   return {
     isSample: true,
     displayName: SAMPLE_CONTEXT.displayName,
+    timezone: 'Asia/Kolkata',
     weightKg: SAMPLE_BODY.weightKg,
     waist: { latestCm: 94.5, changeCm: -1.5, overDays: 28 },
     constraints: {
@@ -176,7 +181,7 @@ export async function getDayView(date?: string): Promise<DayView> {
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle(),
-    supabase.from('profiles').select('display_name').eq('user_id', userId).maybeSingle(),
+    supabase.from('profiles').select('display_name, timezone').eq('user_id', userId).maybeSingle(),
     supabase
       .from('daily_logs')
       .select('kcal, protein_g, steps, water_ml, sleep_minutes')
@@ -258,6 +263,7 @@ export async function getDayView(date?: string): Promise<DayView> {
   return {
     isSample: false,
     displayName: profileRes.data?.display_name || '',
+    timezone: profileRes.data?.timezone || 'Asia/Kolkata',
     weightKg: weighIns.length > 0 ? weighIns[weighIns.length - 1].weightKg : null,
     waist,
     constraints: {

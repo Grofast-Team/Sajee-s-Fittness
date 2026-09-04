@@ -3,84 +3,170 @@
 /*
  * Design tokens. See docs/DESIGN.md for the reasoning.
  *
- * The one idea: colour carries meaning. Turmeric means estimated, pine means
- * measured. Nothing is tinted just to look branded.
+ * Two ideas run through the system:
+ *
+ * 1. Blue is the resting state. It carries progress, navigation and primary
+ *    actions — the things that are settled. It is never applied just to look
+ *    branded, which is why most of the interface is white on very light blue
+ *    rather than blue on blue.
+ * 2. Amber means "we are not certain". A photo estimate, a moderate-confidence
+ *    reading, a target we can only bracket. It is the one colour allowed to
+ *    interrupt the calm, so it has to stay rare.
  */
 
 @theme {
-  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-data: var(--font-plex-mono), ui-monospace, 'SFMono-Regular', monospace;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Breakpoints. Four, not a dozen — see the brief's §83.
+     lg is where the sidebar replaces the bottom bar. */
+  --breakpoint-sm: 30rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 90rem;
 }
 
 :root {
-  /* Warm paper, not clinical white. This app is about kitchens. */
-  --bg: #f7f5f0;
-  --ground: #efece4;
-  --surface: #fffefb;
-  --line: #ded8ca;
-  --line-strong: #c4bcaa;
+  color-scheme: light;
 
-  --fg: #16191b;
-  --fg-muted: #5a5750;
-  --fg-subtle: #86817a;
+  /* --- Surfaces ------------------------------------------------------ */
+  /* Very light blue page, white cards. The premium feel comes from the gap
+     between the two being small; a stronger blue page makes white cards shout
+     and gets tiring across a day of use. */
+  --bg: #f8fafc;
+  --ground: #eff6ff;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
 
-  /* Turmeric — estimated, uncertain, "we are not sure yet". */
-  --signal: #b8801a;
-  --signal-bright: #e0a126;
-  --signal-wash: rgb(224 161 38 / 0.14);
+  /* --- Text ---------------------------------------------------------- */
+  --fg: #0f172a;
+  --fg-muted: #64748b;
+  --fg-subtle: #94a3b8;
+  --on-primary: #ffffff;
+  --on-dark: #f8fafc;
 
-  /* Deep pine — measured, confirmed, done. */
-  --confirm: #1f6f5c;
-  --confirm-wash: rgb(31 111 92 / 0.12);
+  /* --- Primary ------------------------------------------------------- */
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #eff6ff;
+  --primary-tint: #f5f9ff;
+  --primary-wash: rgb(37 99 235 / 0.08);
+  --primary-border: #bfdbfe;
 
-  /* Reserved strictly for safety limits and destructive actions. */
-  --alarm: #a8382a;
-  --alarm-wash: rgb(192 68 46 / 0.1);
+  /* --- Semantic ------------------------------------------------------ */
+  /* Amber — estimated, uncertain, moderate confidence. */
+  --signal: #b45309;
+  --signal-bright: #d97706;
+  --signal-wash: rgb(217 119 6 / 0.12);
+  --signal-border: #fcd34d;
 
-  --on-dark: #f7f5f0;
+  /* Green — measured, completed, met. */
+  --confirm: #047857;
+  --confirm-wash: rgb(4 120 87 / 0.1);
+  --confirm-border: #a7f3d0;
+
+  /* Red — invalid input, failed save, safety limits, destructive actions. */
+  --alarm: #dc2626;
+  --alarm-wash: rgb(220 38 38 / 0.08);
+  --alarm-border: #fecaca;
+
+  /* --- Radius -------------------------------------------------------- */
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-feature: 20px;
+
+  /* --- Shadows ------------------------------------------------------- */
+  /* Barely there. Cards are separated by a border first and a shadow second;
+     heavy floating cards are what make a health app feel like a toy. */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-md: 0 2px 8px rgb(15 23 42 / 0.06);
+  --shadow-lg: 0 8px 28px rgb(15 23 42 / 0.1);
+
+  /* --- Layout -------------------------------------------------------- */
+  --sidebar-w: 15.5rem;
+  --content-max: 80rem;
+  --bottom-nav-h: 4.25rem;
 }
 
+/*
+ * Dark mode is supported but is not the primary experience. Light is the
+ * designed theme; this exists so a phone set to dark at 11pm does not
+ * flashbang someone logging dinner.
+ */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0e1113;
-    --ground: #14181a;
-    --surface: #191e21;
-    --line: #262d31;
-    --line-strong: #3a4247;
+    color-scheme: dark;
 
-    --fg: #edeae3;
-    --fg-muted: #9a978f;
-    --fg-subtle: #6f6c66;
+    --bg: #0b1220;
+    --ground: #172033;
+    --surface: #111a2b;
+    --surface-raised: #162034;
+    --line: #1e293b;
+    --line-strong: #334155;
 
-    --signal: #e0a126;
-    --signal-bright: #f0b642;
-    --signal-wash: rgb(224 161 38 / 0.16);
+    --fg: #e8edf5;
+    --fg-muted: #94a3b8;
+    --fg-subtle: #64748b;
 
-    --confirm: #3d9e86;
-    --confirm-wash: rgb(61 158 134 / 0.16);
+    --primary: #60a5fa;
+    --primary-dark: #3b82f6;
+    --primary-light: #172554;
+    --primary-tint: #0f1e3d;
+    --primary-wash: rgb(96 165 250 / 0.12);
+    --primary-border: #1e3a8a;
+    --on-primary: #06142c;
 
-    --alarm: #d1594a;
-    --alarm-wash: rgb(209 89 74 / 0.14);
+    --signal: #fbbf24;
+    --signal-bright: #fcd34d;
+    --signal-wash: rgb(251 191 36 / 0.14);
+    --signal-border: #78350f;
+
+    --confirm: #34d399;
+    --confirm-wash: rgb(52 211 153 / 0.14);
+    --confirm-border: #065f46;
+
+    --alarm: #f87171;
+    --alarm-wash: rgb(248 113 113 / 0.12);
+    --alarm-border: #7f1d1d;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 2px 8px rgb(0 0 0 / 0.34);
+    --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.45);
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #0e1113;
-  --ground: #14181a;
-  --surface: #191e21;
-  --line: #262d31;
-  --line-strong: #3a4247;
-  --fg: #edeae3;
-  --fg-muted: #9a978f;
-  --fg-subtle: #6f6c66;
-  --signal: #e0a126;
-  --signal-bright: #f0b642;
-  --signal-wash: rgb(224 161 38 / 0.16);
-  --confirm: #3d9e86;
-  --confirm-wash: rgb(61 158 134 / 0.16);
-  --alarm: #d1594a;
-  --alarm-wash: rgb(209 89 74 / 0.14);
+  color-scheme: dark;
+  --bg: #0b1220;
+  --ground: #172033;
+  --surface: #111a2b;
+  --surface-raised: #162034;
+  --line: #1e293b;
+  --line-strong: #334155;
+  --fg: #e8edf5;
+  --fg-muted: #94a3b8;
+  --fg-subtle: #64748b;
+  --primary: #60a5fa;
+  --primary-dark: #3b82f6;
+  --primary-light: #172554;
+  --primary-tint: #0f1e3d;
+  --primary-wash: rgb(96 165 250 / 0.12);
+  --primary-border: #1e3a8a;
+  --on-primary: #06142c;
+  --signal: #fbbf24;
+  --signal-bright: #fcd34d;
+  --signal-wash: rgb(251 191 36 / 0.14);
+  --signal-border: #78350f;
+  --confirm: #34d399;
+  --confirm-wash: rgb(52 211 153 / 0.14);
+  --confirm-border: #065f46;
+  --alarm: #f87171;
+  --alarm-wash: rgb(248 113 113 / 0.12);
+  --alarm-border: #7f1d1d;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 0.34);
+  --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.45);
 }
 
 * {
@@ -98,65 +184,114 @@ body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
 }
 
 /*
- * Display type. Bricolage is variable — the tight tracking and heavier optical
- * weight is what stops headings reading as generic sans.
+ * Display type. Inter at a tight track and a heavier optical weight — one
+ * family doing two jobs. A second display face was removed: it cost a font
+ * download on what may be a shared 4G hotspot, and Inter set properly carries
+ * the headings on its own.
  */
 .display {
-  font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  font-weight: 640;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
 }
 
-/* Every number in the app. Numbers are the content, so they get their own
-   face — and tabular figures stop columns twitching as digits change. */
+/*
+ * Every number in the app. Tabular figures stop columns twitching as digits
+ * change — a step count that jitters while you read it feels unreliable, and
+ * this app's whole argument is that its numbers can be trusted.
+ */
 .data {
-  font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 1;
-  letter-spacing: -0.02em;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.015em;
 }
 
-/* Small uppercase label. Used for section eyebrows and units. */
+/*
+ * Small supporting label. Sentence case, not tracked-out caps: this app talks
+ * to beginners, and shouting in capitals above every block is how interfaces
+ * for people who already know the vocabulary tend to read.
+ */
 .eyebrow {
-  font-family: var(--font-data);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--fg-subtle);
+  letter-spacing: 0;
 }
 
-/* Hairline rule. Sections separate by line and ground shift rather than by
-   wrapping everything in its own bordered card. */
 .rule {
   height: 1px;
   background: var(--line);
 }
 
+/* --- Focus ---------------------------------------------------------- */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--signal-bright);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+/* --- Layout helpers -------------------------------------------------- */
+
+/*
+ * Page padding steps up with the viewport: 16 / 24 / 32. Written once here
+ * rather than repeated as three utility classes on every page wrapper.
+ */
+.gutter {
+  padding-inline: 1rem;
+}
+
+@media (min-width: 48rem) {
+  .gutter {
+    padding-inline: 1.5rem;
   }
 }
 
-/* The rail settles into place on load. One orchestrated moment, not scattered
-   effects — and it reads as an instrument coming to rest. */
+@media (min-width: 64rem) {
+  .gutter {
+    padding-inline: 2rem;
+  }
+}
+
+/* Content stops growing before text gets unreadably wide on a 1920 monitor. */
+.content-max {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  width: 100%;
+}
+
+/* Reading measure for prose and chat — under 80 characters. */
+.measure {
+  max-width: 68ch;
+}
+
+/* Room for the bottom bar, which only exists below the desktop breakpoint. */
+.has-bottom-nav {
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 1rem);
+}
+
+@media (min-width: 64rem) {
+  .has-bottom-nav {
+    padding-bottom: 2.5rem;
+  }
+}
+
+/* Wide content — tables, charts — scrolls inside its own box so the page body
+   never scrolls sideways. */
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* --- Motion ---------------------------------------------------------- */
+
+/*
+ * One orchestrated moment: progress settles into place when a screen loads.
+ * Everything else moves only in answer to something the person did.
+ */
 @keyframes rail-settle {
   from {
     transform: scaleX(0);
@@ -169,4 +304,58 @@ body {
 .rail-fill {
   transform-origin: left center;
   animation: rail-settle 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ring-settle {
+  from {
+    stroke-dashoffset: var(--ring-circumference);
+  }
+}
+
+.ring-arc {
+  animation: ring-settle 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sheet-rise {
+  from {
+    transform: translateY(8%);
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.sheet-rise {
+  animation: sheet-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.fade-in {
+  animation: fade-in 180ms ease-out both;
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton {
+  background: var(--ground);
+  border-radius: 6px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

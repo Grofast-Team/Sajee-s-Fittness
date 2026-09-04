@@ -1,25 +1,16 @@
 import type { Metadata, Viewport } from 'next';
-import { Bricolage_Grotesque, IBM_Plex_Mono, Inter } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 
 /**
- * Three faces, three jobs. See docs/DESIGN.md.
+ * One family, two jobs. See docs/DESIGN.md.
  *
- * Numbers get their own face because numbers are the content here — a figure in
- * Plex Mono reads as *a measurement* the instant you see it.
+ * Inter carries both the headings (tight tracking, heavier optical weight) and
+ * the body. Numbers get tabular figures rather than a separate monospace face:
+ * a second and third font download is real time on a slow connection, and the
+ * mono only ever bought a texture the interface does not need.
  */
-const bricolage = Bricolage_Grotesque({
-  subsets: ['latin'],
-  variable: '--font-bricolage',
-  display: 'swap',
-});
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-plex-mono',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'FitCoach',
@@ -31,18 +22,18 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f5f0' },
-    { media: '(prefers-color-scheme: dark)', color: '#0e1113' },
+    { media: '(prefers-color-scheme: light)', color: '#f8fafc' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1220' },
   ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${inter.variable} ${plexMono.variable}`}>
+    <html lang="en" className={inter.variable}>
       <body>
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:px-4 focus:py-2"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:px-4 focus:py-2 focus:shadow-lg"
           style={{ background: 'var(--surface)', color: 'var(--fg)' }}
         >
           Skip to content

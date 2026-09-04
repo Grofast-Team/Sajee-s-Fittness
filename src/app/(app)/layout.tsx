@@ -1,9 +1,18 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Settings } from 'lucide-react';
-import { BottomNav } from '@/components/bottom-nav';
+import { BottomNav, MobileHeader, Sidebar } from '@/components/app-nav';
 import { needsOnboarding } from '@/lib/data/onboarding-state';
 
+/**
+ * The application shell.
+ *
+ * One layout, three shapes. Below 1024px the navigation is a bottom bar with a
+ * compact header above the content; from 1024px the bar is replaced by a
+ * sidebar. They are never both on screen — two navigations competing is how a
+ * responsive app ends up feeling like two apps stitched together.
+ *
+ * The content column stops at 1280px so text does not stretch into an
+ * unreadable line on a 1920px monitor.
+ */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // A signed-in user with no plan has not finished setup. Showing them the
   // sample profile — someone else's numbers behind a warning banner — is worse
@@ -13,24 +22,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="mx-auto min-h-dvh max-w-lg">
-      {/* Settings deliberately lives here rather than in the bottom bar: five
-          destinations is the practical ceiling before targets get too narrow to
-          hit, and settings is a rare visit compared to the daily five. */}
-      <div className="flex justify-end px-4 pt-3">
-        <Link
-          href="/settings"
-          aria-label="Settings"
-          className="flex size-11 items-center justify-center rounded-md transition-colors duration-200"
-          style={{ color: 'var(--fg-subtle)' }}
-        >
-          <Settings size={20} aria-hidden />
-        </Link>
-      </div>
+    <div className="min-h-dvh">
+      <Sidebar />
 
-      <main id="main" className="px-4 pb-8">
-        {children}
-      </main>
+      <div className="lg:pl-(--sidebar-w)">
+        <MobileHeader />
+
+        <main id="main" className="gutter has-bottom-nav">
+          <div className="content-max">{children}</div>
+        </main>
+      </div>
 
       <BottomNav />
     </div>

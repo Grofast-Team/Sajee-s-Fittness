@@ -266,20 +266,73 @@ export const STEPS: Step[] = [
   },
 
   {
+    id: 'fitness',
+    title: 'Where you are now',
+    intro:
+      'Four questions instead of asking whether you are a beginner. People answer that one with ' +
+      'their ambitions, and we would rather start you somewhere you can actually finish.',
+    fields: [
+      {
+        id: 'recentTraining',
+        label: 'Over the last three months, how often have you exercised?',
+        type: 'choice',
+        options: [
+          { value: 'never', label: 'Not at all' },
+          { value: 'occasional', label: 'Now and then' },
+          { value: 'two_three', label: '2-3 days a week' },
+          { value: 'four_plus', label: '4 or more days a week' },
+        ],
+      },
+      {
+        id: 'squats10',
+        label: 'Could you do ten squats right now without stopping?',
+        type: 'choice',
+        because: 'This decides whether we start you at a chair or standing.',
+        options: [
+          { value: 'yes', label: 'Yes' },
+          { value: 'no', label: 'No' },
+          { value: 'unsure', label: 'Not sure' },
+        ],
+      },
+      {
+        id: 'plank20',
+        label: 'Could you hold a plank for twenty seconds?',
+        type: 'choice',
+        options: [
+          { value: 'yes', label: 'Yes' },
+          { value: 'no', label: 'No' },
+          { value: 'unsure', label: 'Not sure' },
+        ],
+      },
+      {
+        id: 'liftedBefore',
+        label: 'Have you trained with weights before, at any point?',
+        type: 'choice',
+        because: 'Not whether you do now — whether the movements will be unfamiliar.',
+        options: [
+          { value: 'yes', label: 'Yes' },
+          { value: 'no', label: 'No' },
+        ],
+      },
+      {
+        id: 'apartmentOnly',
+        label: 'Do you need to avoid jumping?',
+        type: 'choice',
+        because:
+          'Neighbours below, a shared floor, or knees that would rather not. We will keep the ' +
+          'sessions quiet and low-impact.',
+        options: [
+          { value: 'yes', label: 'Yes, keep it quiet' },
+          { value: 'no', label: 'Jumping is fine' },
+        ],
+      },
+    ],
+  },
+
+  {
     id: 'movement',
     title: 'Exercise',
     fields: [
-      {
-        id: 'experience',
-        label: 'How much exercise experience do you have?',
-        type: 'choice',
-        options: [
-          { value: 'none', label: 'None at all' },
-          { value: 'beginner', label: 'A little' },
-          { value: 'returning', label: 'Used to train, stopped' },
-          { value: 'intermediate', label: 'Train regularly' },
-        ],
-      },
       {
         id: 'equipment',
         label: 'What do you have access to?',
