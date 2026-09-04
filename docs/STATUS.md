@@ -4,7 +4,7 @@ An honest account of what exists, what is partial, and what has not been built.
 The brief's rule 98 applies to this document as much as to the UI: nothing is
 described as working that has not been run.
 
-Verified by `npm test` (143 passing), `npm run test:rls` (18 passing against a
+Verified by `npm test` (189 passing), `npm run test:rls` (19 passing against a
 live project), `npm run build` (clean), `eslint` (clean),
 and — as of this revision — **against a live Supabase project and a production
 Vercel deployment**, not only in sample mode.
@@ -12,6 +12,11 @@ Vercel deployment**, not only in sample mode.
 Live verification performed:
 
 - All 15 migrations applied to a fresh project, first attempt, no manual fixes
+- **The development project is currently ahead of git.** Migrations
+  `20260903120001`–`20260903120004` (video system, progression seeding, ladder
+  fixes) are applied to the linked project but are not yet committed. A fresh
+  clone will not reproduce that database until they land. `supabase migration
+  list` is the authority on what is actually applied.
 - 51 foods, 71 aliases, 34 serving units, 12 exercises, 4 workouts, 6 lessons seeded
 - Alias search exercised against the real RPC: thosai/dosai/idly/sambhar/thayir/
   "meal maker" all resolve correctly; gibberish returns nothing
@@ -92,7 +97,8 @@ Live verification performed:
 | --- | --- |
 | Exercise library with instructions, mistakes, easier variants | **Done** (12 exercises seeded) |
 | Workout templates | **Done** (4 seeded) |
-| Weekly plan + missed-session recovery UI | **Partial** — renders from engines, but the week grid is still fixed content and nothing is persisted |
+| Weekly plan + missed-session recovery UI | **Done** — `ensureWeekPlanned()` writes the week on first visit and is idempotent; `updateSession` persists completed / partial / skipped / moved, and a moved session is re-created on its new date rather than left as a dead "moved" row |
+| Perceived difficulty and pain capture | **Not built in committed code** — `session_feedback` exists and is applied, but nothing committed writes to it |
 | MET-based expenditure, net of resting | **Done**, tested |
 | Device integrations (Apple Health / Health Connect) | **Not built** — manual entry only, honestly labelled |
 
@@ -161,11 +167,17 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
 2. **Sleep entry UI.** `logSleep` exists but nothing calls it, so
    `daily_logs.sleep_minutes` stays null and the adherence engine's sleep
    component always scores zero for real users.
-4. **Workout completion.** The session and week grid on Activity are still fixed
-   content — marking a session done writes nothing, so `workout_adherence`
-   cannot be computed from real data.
-5. **Scheduled adaptation.** The adapt engine is built and tested but nothing
-   runs it weekly, so plans never actually change.
-6. Verify the seed nutrition data.
-7. Coach chat endpoint.
-8. Test the photo pipeline against real scale photographs.
+3. **Difficulty and pain capture.** `session_feedback` is applied and has RLS
+   coverage, but no committed UI writes to it. Until something does, the
+   progression engine has no signal and `workout_plans.rpe` — which cannot
+   distinguish "hard" from "hurts" — remains the only difficulty column, and
+   is itself unwritten.
+4. **Scheduled adaptation.** The adapt engine is built and tested but nothing
+   runs it weekly, so plans never actually change. It also has no training
+   lever yet: its decision set can move intake and steps only.
+5. Verify the seed nutrition data.
+6. Coach chat endpoint.
+7. Test the photo pipeline against real scale photographs.
+
+Workout completion used to head this list and no longer does: the week grid
+persists, so `workout_adherence` can now be computed from real rows.
