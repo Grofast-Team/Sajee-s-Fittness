@@ -111,6 +111,17 @@ suite('Row Level Security', () => {
         reason: 'alice private reason',
         guidance: 'alice private guidance',
       });
+      // Session feedback carries the most sensitive free text in the schema:
+      // where it hurt. It arrived with the video/progression migration, so it
+      // is exercised explicitly rather than only through the table sweep.
+      await alice.client.from('session_feedback').insert({
+        user_id: alice.id,
+        performed_on: '2026-01-15',
+        difficulty: 4,
+        pain: 'pain',
+        pain_location: 'alice private left knee',
+        completed: true,
+      });
     }, 30_000);
 
     it('returns nothing from Alice’s measurements when Bob asks', async () => {
@@ -130,6 +141,17 @@ suite('Row Level Security', () => {
       const { data } = await bob.client.from('safety_flags').select('reason, guidance');
       const text = JSON.stringify(data ?? []);
       expect(text).not.toContain('alice private');
+    });
+
+    it('does not leak where another user reported pain', async () => {
+      // An injury location is health data about a named body part. It is also
+      // the field the progression engine reads to withhold load, so it will be
+      // queried often — which is exactly when a missing policy gets noticed.
+      const { data } = await bob.client
+        .from('session_feedback')
+        .select('pain, pain_location, difficulty');
+      expect(data ?? [], 'session_feedback leaked rows').toHaveLength(0);
+      expect(JSON.stringify(data ?? [])).not.toContain('alice private');
     });
 
     /**
@@ -155,6 +177,13 @@ suite('Row Level Security', () => {
         .select('reason')
         .eq('user_id', alice.id);
       expect(allFlags ?? []).not.toHaveLength(0);
+
+      const { data: allFeedback } = await admin
+        .from('session_feedback')
+        .select('pain_location')
+        .eq('user_id', alice.id);
+      expect(allFeedback ?? [], 'Alice has no session feedback to withhold').not.toHaveLength(0);
+      expect(JSON.stringify(allFeedback)).toContain('alice private left knee');
 
       // Same query, same rows present — but through Bob's session it is empty.
       const { data: bobsView } = await bob.client.from('measurements').select('user_id, notes');
