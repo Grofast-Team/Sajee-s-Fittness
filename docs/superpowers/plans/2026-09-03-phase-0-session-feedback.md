@@ -1,5 +1,33 @@
 # Phase 0: Session Feedback Capture — Implementation Plan
 
+> **SUPERSEDED IN PART — read this before executing anything below.**
+>
+> Tasks 1–4 were implemented concurrently by parallel work while this plan was
+> being written. **Do not execute Tasks 2, 3 or 4.** Running them would create
+> a second `logSessionFeedback`, duplicate the difficulty and pain constants,
+> and claim migration numbers that are already taken.
+>
+> | Task | Where it actually landed |
+> | --- | --- |
+> | 1 — migrations | Applied through `20260903120004`; confirm with `supabase migration list` |
+> | 1 — RLS coverage | **Done** in commit `64103ef`, including a `pain_location` leak test |
+> | 2 — mapping constants | `DIFFICULTY` / `PAIN` in `src/components/session-feedback.tsx` |
+> | 3 — server action | `logSessionFeedback` in `src/lib/actions/session.ts` |
+> | 4 — feedback panel | `SessionFeedback` in `src/components/session-feedback.tsx` |
+> | 5 — STATUS.md | **Done** in commit `3383ca5` |
+>
+> The delivered implementation uses the **full 1–5 difficulty scale**, not the
+> 2/3/4 mapping specified below. That is the better choice and the plan is
+> wrong here: a rating of 5 reaches `decideProgression()`, so the regression
+> branch is live rather than unreachable.
+>
+> **One item remains unbuilt:** the `comment on column` migration deprecating
+> `workout_plans.rpe` in favour of `session_feedback.difficulty`. It was left
+> alone because the migration sequence was being extended concurrently and the
+> next free number kept being taken. Take the next free number and write it.
+>
+> The design reasoning below is kept for context. The task steps are history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Record how hard each session felt, and whether it hurt, into
