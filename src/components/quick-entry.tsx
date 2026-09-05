@@ -166,7 +166,10 @@ export function StepEntry({ canSave, current }: { canSave: boolean; current: num
       <Field
         label="Steps so far"
         htmlFor="steps"
-        description="Read it off your phone's health app. We do not sync with devices yet, and we would rather you enter a real number than have us invent one."
+        // Was "we do not sync with devices yet", which stopped being true the
+        // moment the Android app could read Health Connect — and it sat
+        // directly above the sync control, contradicting it.
+        description="Read it off your phone's health app. We would rather you enter a real number than have us invent one."
       >
         <input
           id="steps"

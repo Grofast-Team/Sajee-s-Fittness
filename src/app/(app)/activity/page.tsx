@@ -4,9 +4,12 @@ import { StepEntry } from '@/components/quick-entry';
 import { WeekPlan } from '@/components/week-plan';
 import { LevelPanel, NextStepCard } from '@/components/next-step';
 import { SessionFeedback } from '@/components/session-feedback';
+import { StepSync } from '@/components/step-sync';
+import { StepTimeline } from '@/components/step-timeline';
 import { getDayView } from '@/lib/data/day';
 import { getWeekView } from '@/lib/data/week';
 import { getNextStep } from '@/lib/data/next-step';
+import { getStepValidity } from '@/lib/data/step-validity';
 import { ensureWeekPlanned } from '@/lib/actions/training';
 import { progressStepGoal, stepsToMinutes } from '@/lib/engines/steps';
 import { activityKcal } from '@/lib/engines/energy';
@@ -45,7 +48,11 @@ export default async function ActivityPage({
   const requested = Number((await searchParams).mins);
   const minutes = Number.isFinite(requested) ? Math.min(120, Math.max(5, requested)) : 30;
 
-  const [week, step] = await Promise.all([getWeekView(), getNextStep(minutes)]);
+  const [week, step, stepValidity] = await Promise.all([
+    getWeekView(),
+    getNextStep(minutes),
+    getStepValidity(),
+  ]);
 
   const stepsSoFar = day.stepsToday;
   const short = stepsSoFar === null ? null : Math.max(0, day.stepTarget - stepsSoFar);
@@ -160,9 +167,25 @@ export default async function ActivityPage({
             </div>
           </Panel>
 
+          {/* Only shown once a phone has actually synced. Before that there is
+              nothing to explain, and an empty timeline would be noise. */}
+          {stepValidity ? (
+            <Panel>
+              <Section title="Today's steps">
+                <StepTimeline view={stepValidity} target={day.stepTarget} />
+              </Section>
+            </Panel>
+          ) : null}
+
           <Panel>
             <Section title="Record your steps">
               <StepEntry canSave={!day.isSample} current={day.stepsToday} />
+              {/* Manual entry stays the working path on the web, where there is
+                  no step counter to read. Sync is an addition, not a
+                  replacement. */}
+              <div className="mt-5">
+                <StepSync />
+              </div>
             </Section>
           </Panel>
 
