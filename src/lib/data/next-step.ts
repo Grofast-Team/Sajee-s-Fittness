@@ -151,7 +151,7 @@ export async function getNextStep(minutesAvailable = 30): Promise<NextStep> {
       readLevelState(supabase, userId),
       supabase
         .from('lifestyle')
-        .select('equipment, injuries, session_minutes_available')
+        .select('equipment, injuries, session_minutes_available, avoid_jumping')
         .eq('user_id', userId)
         .maybeSingle(),
       supabase
@@ -205,6 +205,9 @@ export async function getNextStep(minutesAvailable = 30): Promise<NextStep> {
     minutesAvailable: Math.min(minutesAvailable, budget),
     injuries,
     restrictions,
+    // Shared floors and thin walls. Collected at onboarding and, until now,
+    // discarded — the recommender has always supported the filter.
+    apartmentOnly: lifestyleRes.data?.avoid_jumping ?? false,
   });
 
   // Only judge progression once there is something to judge.

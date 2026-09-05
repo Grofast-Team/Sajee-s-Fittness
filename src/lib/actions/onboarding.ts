@@ -1,13 +1,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
 import { deriveActivityLevel, estimateBmr, estimateTdee } from '@/lib/engines/energy';
 import { computeEnergyTarget, computeMacros, waterTargetMl } from '@/lib/engines/targets';
 import { initialStepGoal } from '@/lib/engines/steps';
 import { restrictionsFrom, screen } from '@/lib/engines/safety';
+import { assessFitnessLevel, type FitnessLevel } from '@/lib/engines/progression';
+import { answersSchema } from '@/lib/onboarding-schema';
 import type { BodyInput, Pace, Sex } from '@/lib/engines/types';
 
 /**
@@ -19,59 +20,19 @@ import type { BodyInput, Pace, Sex } from '@/lib/engines/types';
  * enforce. So the client sends answers; the server derives the plan.
  */
 
-const answersSchema = z.object({
-  name: z.string().trim().max(80).optional(),
-  age: z.coerce.number().int().min(13).max(100),
-  sex: z.enum(['male', 'female', 'intersex', 'prefer_not_to_say']),
-  heightCm: z.coerce.number().min(90).max(250),
-  weightKg: z.coerce.number().min(25).max(400),
-
-  pregnant: z.string().optional(),
-  breastfeeding: z.string().optional(),
-  eatingDisorderHistory: z.string().optional(),
-  conditions: z.array(z.string()).default([]),
-
-  goal: z.string().default('fat_loss'),
-  targetWeightKg: z.coerce.number().min(25).max(400).optional(),
-  targetWeeks: z.coerce.number().int().min(1).max(260).optional(),
-  pace: z.enum(['gentle', 'steady', 'firm']).default('steady'),
-
-  workPattern: z.string().optional(),
-  sittingHours: z.coerce.number().min(0).max(24).optional(),
-  nightShift: z.string().optional(),
-  wakeTime: z.string().optional(),
-  sleepTime: z.string().optional(),
-  sleepHours: z.coerce.number().min(0).max(16).optional(),
-  baselineSteps: z.coerce.number().int().min(0).max(60000).optional(),
-
-  diet: z.string().default('non_vegetarian'),
-  cuisines: z.array(z.string()).default([]),
-  allergies: z.string().optional(),
-  dislikes: z.string().optional(),
-  favourites: z.string().optional(),
-  mealsPerDay: z.coerce.number().int().min(1).max(8).optional(),
-
-  cooksOwnFood: z.string().optional(),
-  cookIdentity: z.string().optional(),
-  cookMinutes: z.coerce.number().int().min(0).max(240).optional(),
-  kitchenEquipment: z.array(z.string()).default([]),
-  budgetPerDay: z.string().optional(),
-  sharedHousehold: z.string().optional(),
-
-  experience: z.string().default('none'),
-  equipment: z.string().default('none'),
-  trainingDays: z.coerce.number().int().min(0).max(7).optional(),
-  sessionMinutes: z.coerce.number().int().min(0).max(240).optional(),
-  activities: z.array(z.string()).default([]),
-  injuries: z.string().optional(),
-
-  previousAttempts: z.string().optional(),
-  whatWentWrong: z.array(z.string()).default([]),
-  stress: z.coerce.number().int().min(1).max(5).optional(),
-  emotionalEating: z.string().optional(),
-});
-
 export type SaveResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Map the assessed level onto the older `experience` enum.
+ *
+ * Two scales for the same thing is not ideal, but `experience` is what the
+ * week planner already reads, and leaving it hardcoded to 'none' meant an
+ * experienced user got a beginner's week no matter what they answered.
+ * Deriving it keeps the two in step until the planner moves to levels.
+ */
+function experienceFor(level: FitnessLevel): string {
+  return { 1: 'none', 2: 'beginner', 3: 'intermediate', 4: 'advanced' }[level];
+}
 
 /** Free-text lists arrive comma-separated; store them as clean arrays. */
 function toList(value: string | undefined): string[] {
@@ -157,6 +118,21 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
     ? new Date(Date.now() + a.targetWeeks * 7 * 86_400_000).toISOString().slice(0, 10)
     : null;
 
+  /*
+   * Derive the starting level from what they said they can do.
+   *
+   * Computed here rather than trusted from the client for the same reason the
+   * energy target is: a posted `fitness_level: 4` would hand a beginner
+   * advanced sessions, which is the single outcome this whole system exists to
+   * prevent.
+   */
+  const assessment = assessFitnessLevel({
+    recentTraining: a.recentTraining,
+    squats10: a.squats10,
+    plank20: a.plank20,
+    liftedBefore: a.liftedBefore,
+  });
+
   // ---- Write ---------------------------------------------------------------
   // Each upsert is keyed on user_id, so re-running onboarding updates rather
   // than duplicating. RLS means a wrong user_id here would be rejected by the
@@ -170,7 +146,8 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
           age_years: a.age,
           sex: a.sex,
           height_cm: a.heightCm,
-          experience: a.experience,
+          experience: experienceFor(assessment.level),
+          fitness_level: assessment.level,
           onboarding_step: 8,
           onboarding_done_at: new Date().toISOString(),
         },
@@ -183,6 +160,8 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
           work_pattern: a.workPattern ?? null,
           sitting_hours: a.sittingHours ?? null,
           night_shift: isYes(a.nightShift),
+          work_start: a.shiftStart || null,
+          work_end: a.shiftEnd || null,
           wake_time: a.wakeTime || null,
           sleep_time: a.sleepTime || null,
           typical_sleep_hours: a.sleepHours ?? null,
@@ -193,6 +172,7 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
           equipment: a.equipment,
           session_minutes_available: a.sessionMinutes ?? null,
           injuries: toList(a.injuries),
+          avoid_jumping: isYes(a.apartmentOnly),
         },
         { onConflict: 'user_id' },
       ),
@@ -221,6 +201,27 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
 
     const failed = writes.find((w) => w.error);
     if (failed?.error) throw failed.error;
+
+    /*
+     * Keep the raw answers next to the level they produced.
+     *
+     * If the rubric is ever changed, every existing user can be re-scored from
+     * what they actually said. Without this the level becomes a number nobody
+     * can explain or reproduce — and the "Where you are" panel claims to
+     * explain exactly that.
+     */
+    await supabase.from('fitness_assessments').insert({
+      user_id: userId,
+      answers: {
+        recentTraining: a.recentTraining ?? null,
+        squats10: a.squats10 ?? null,
+        plank20: a.plank20 ?? null,
+        liftedBefore: a.liftedBefore ?? null,
+      },
+      assessed_level: assessment.level,
+      score: assessment.score,
+      reasons: assessment.reasons,
+    });
 
     // Retire any previous goal before opening a new one, so "active" stays
     // meaningful.
