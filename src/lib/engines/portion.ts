@@ -259,3 +259,92 @@ export const WHY_THE_SCALE_HELPS =
   'A photo can tell us what you ate. It cannot tell us how much, and portion size is where almost ' +
   'all the error in food tracking comes from. With the scale in the frame we read the actual weight, ' +
   'so your numbers stop being a guess.';
+
+/* ------------------------------------------------------------------ */
+/* Plausibility                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A single food entry this heavy is almost always a mistyped field.
+ *
+ * 1.5 kg of one food in one sitting is possible — a big pot of sambar shared
+ * at the table, a watermelon — so this is a question, never a refusal. The
+ * number that prompted it was 180 typed into a "how many pieces" box, which
+ * logged 14.4 kg of dosa and roughly 25,000 kcal without a murmur.
+ */
+const UNUSUAL_GRAMS = 1500;
+
+/** Above this, "did you mean something else?" is the only sensible reading. */
+const IMPLAUSIBLE_GRAMS = 4000;
+
+/** Household counts beyond this are far more likely to be a slip. */
+const UNUSUAL_COUNT = 20;
+
+export interface PlausibilityCheck {
+  plausible: boolean;
+  /** Shown as a question. Never a correction, and never about the eating. */
+  question: string | null;
+}
+
+/**
+ * Sanity-check a quantity before it joins the day's total.
+ *
+ * Two rules govern the wording. It queries the **entry**, not the appetite —
+ * this exists to catch a slipped finger, and a tracker that editorialises
+ * about how much someone ate is the thing this product refuses to be. And it
+ * never blocks: the user is the authority on what they ate, so a surprising
+ * number is questioned once and then accepted if they stand by it.
+ */
+export function checkPlausibility(input: {
+  grams: number | null;
+  householdCount?: number | null;
+  unitLabel?: string | null;
+  foodName?: string;
+}): PlausibilityCheck {
+  const { grams, householdCount, unitLabel } = input;
+
+  if (householdCount != null && householdCount > UNUSUAL_COUNT) {
+    return {
+      plausible: false,
+      question:
+        `That is ${householdCount} ${pluralise(unitLabel ?? 'serving', householdCount)}${
+          grams ? ` — about ${formatWeight(grams)}` : ''
+        }. If you meant a different number, change it above; if that is right, carry on.`,
+    };
+  }
+
+  if (grams != null && grams >= IMPLAUSIBLE_GRAMS) {
+    return {
+      plausible: false,
+      question:
+        `${formatWeight(grams)} in one entry is a lot for a single food — worth a second look at ` +
+        `the number above before you add it.`,
+    };
+  }
+
+  if (grams != null && grams >= UNUSUAL_GRAMS) {
+    return {
+      plausible: false,
+      question: `${formatWeight(grams)} is more than most single portions. Just checking the number is right.`,
+    };
+  }
+
+  return { plausible: true, question: null };
+}
+
+function formatWeight(grams: number): string {
+  return grams >= 1000 ? `${(grams / 1000).toFixed(1)} kg` : `${Math.round(grams)} g`;
+}
+
+/**
+ * Pluralise a household unit.
+ *
+ * Deliberately small: these labels are a short, known set — piece, cup, bowl,
+ * glass, katori, ladle, tablespoon — and none of them is irregular. Anything
+ * already ending in "s" is left alone so "glass" does not become "glasss".
+ */
+function pluralise(unit: string, count: number): string {
+  if (count === 1) return unit;
+  if (/(s|sh|ch|x)$/i.test(unit)) return `${unit}es`;
+  return `${unit}s`;
+}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, Scale, Search, X } from 'lucide-react';
 import { Alert, Button, ConfidenceBadge, Field, inputClass, inputStyle } from '@/components/ui';
-import { resolvePortion } from '@/lib/engines/portion';
+import { checkPlausibility, resolvePortion } from '@/lib/engines/portion';
 import { estimateNutrition, type FoodDensity } from '@/lib/engines/nutrition';
 import { logFood } from '@/lib/actions/food';
 
@@ -247,6 +247,20 @@ function PortionPicker({
 
   const estimate = estimateNutrition(food, portion);
 
+  /*
+   * Catch a slipped finger before it lands in the day's total.
+   *
+   * Typing 180 into the "how many pieces" box logged 180 dosas — 14.4 kg and
+   * roughly 25,000 kcal — completely straight. The arithmetic was right and
+   * the result was nonsense, and nothing on screen questioned it.
+   */
+  const plausibility = checkPlausibility({
+    grams: portion.grams ?? portion.gramsHigh ?? null,
+    householdCount: mode === 'serving' ? count : null,
+    unitLabel: mode === 'serving' ? serving.unitLabel : null,
+    foodName: food.name,
+  });
+
   /**
    * Only the food id, the meal and the portion go to the server — never the
    * calorie figure computed above. The server looks the food up and recomputes,
@@ -440,6 +454,15 @@ function PortionPicker({
           </p>
         ) : null}
       </div>
+
+      {/* A question, not a barrier — the entry stays addable either way. */}
+      {!plausibility.plausible && plausibility.question ? (
+        <div className="mt-3">
+          <Alert tone="warning" title="Does that look right?">
+            {plausibility.question}
+          </Alert>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="mt-3">
