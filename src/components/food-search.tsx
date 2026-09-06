@@ -332,7 +332,11 @@ function PortionPicker({
         <Field
           label="How many grams?"
           htmlFor="grams"
-          description="Weighed portions are exact. This is the accurate option."
+          // Not "this is the accurate option" any more. Weighing removes the
+          // portion error, which is the bigger of the two, but it cannot tell
+          // us what went into the pan — and promising accuracy directly above
+          // a readout that says "Estimated" undercuts both claims.
+          description="Weighing removes the biggest source of error, so this is the option worth using."
         >
           <div className="flex items-center gap-2">
             <input
@@ -419,6 +423,22 @@ function PortionPicker({
         <p className="mt-1.5 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
           {portion.explanation}
         </p>
+
+        {/*
+         * Say where the remaining uncertainty comes from.
+         *
+         * Without this, someone who has just weighed their food to the gram
+         * sees a range anyway and concludes the scale was pointless. It was
+         * not — weighing removed the larger of the two unknowns. What is left
+         * is the recipe, and that is worth naming so the effort reads as
+         * rewarded rather than ignored.
+         */}
+        {food.verified !== true && portion.confidence === 'high' ? (
+          <p className="mt-1.5 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
+            The weight is exact. The range is what we do not know about the recipe — how much oil
+            or ghee went in changes this more than a few grams either way.
+          </p>
+        ) : null}
       </div>
 
       {error ? (

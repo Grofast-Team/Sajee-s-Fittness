@@ -20,7 +20,31 @@ export interface FoodDensity {
   fibrePer100g?: number | null;
   /** Never mix states: 100 g of raw rice is not 100 g of cooked rice. */
   foodState: 'raw' | 'cooked' | 'as_sold' | 'prepared' | 'dry';
+  /**
+   * Whether these composition figures were checked against a real reference
+   * (IFCT, USDA, a verified label) or are a working approximation.
+   *
+   * Defaults to `false` deliberately. Every food currently in the database is
+   * `seed_approximate` or user-submitted and none has been reconciled against
+   * a reference, so "unverified" is the accurate default rather than merely
+   * the cautious one. A food that has genuinely been checked has to say so.
+   */
+  verified?: boolean;
 }
+
+/**
+ * How wrong an unverified composition figure can reasonably be.
+ *
+ * This is a stated modelling assumption, not a measurement. Composition for
+ * the same named dish varies widely with recipe, oil and preparation — a dosa
+ * made with more ghee is a different food nutritionally — and ±15% is a
+ * conservative band for that spread rather than a precise error bar.
+ *
+ * It exists so that a perfectly weighed portion of an unverified food reports
+ * a range instead of a confident single number. The scale measured the
+ * portion accurately; it did not measure what the food is made of.
+ */
+export const APPROXIMATE_DENSITY_ERROR = 0.15;
 
 export interface Nutrition {
   kcal: number;
@@ -65,6 +89,31 @@ export function nutritionForGrams(food: FoodDensity, grams: number): Nutrition {
 export function estimateNutrition(food: FoodDensity, portion: PortionResult): NutritionEstimate {
   if (portion.grams !== null && portion.confidence === 'high') {
     const n = nutritionForGrams(food, portion.grams);
+
+    /*
+     * A weighed portion is not the same as a known number of calories.
+     *
+     * Confidence used to be read from the portion alone, so weighing an
+     * unverified food on a scale produced "302 kcal" with no range and a
+     * "Weighed" label. The scale was accurate; the composition figures behind
+     * it were an approximation nobody had checked, and the interface implied
+     * otherwise. The final number can only be as good as its weaker input.
+     */
+    if (food.verified !== true) {
+      const kcalLow = Math.round(n.kcal * (1 - APPROXIMATE_DENSITY_ERROR));
+      const kcalHigh = Math.round(n.kcal * (1 + APPROXIMATE_DENSITY_ERROR));
+
+      return {
+        ...n,
+        confidence: 'medium',
+        kcalLow,
+        kcalHigh,
+        grams: portion.grams,
+        basis: `${portion.basis} Nutrition data for this food is approximate.`,
+        display: `Estimated ${kcalLow.toLocaleString()}–${kcalHigh.toLocaleString()} kcal`,
+      };
+    }
+
     return {
       ...n,
       confidence: 'high',
@@ -92,8 +141,17 @@ export function estimateNutrition(food: FoodDensity, portion: PortionResult): Nu
 
   const midGrams = (low + high) / 2;
   const mid = nutritionForGrams(food, midGrams);
-  const kcalLow = Math.round((food.kcalPer100g * low) / 100);
-  const kcalHigh = Math.round((food.kcalPer100g * high) / 100);
+
+  /*
+   * Two independent uncertainties, so the band has to carry both.
+   *
+   * The portion is a range, and for an unverified food the composition is a
+   * range too. Reporting only the portion spread would understate what we
+   * actually do not know.
+   */
+  const densityError = food.verified === true ? 0 : APPROXIMATE_DENSITY_ERROR;
+  const kcalLow = Math.round(((food.kcalPer100g * low) / 100) * (1 - densityError));
+  const kcalHigh = Math.round(((food.kcalPer100g * high) / 100) * (1 + densityError));
 
   return {
     ...mid,

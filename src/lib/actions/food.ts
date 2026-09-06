@@ -72,7 +72,7 @@ export async function logFood(input: unknown): Promise<LogResult> {
   const { data: foodRow, error: foodError } = await supabase
     .from('foods')
     .select(
-      'id, name, kcal_per_100g, protein_per_100g, carb_per_100g, fat_per_100g, fibre_per_100g, food_state, typical_cost_per_100g',
+      'id, name, kcal_per_100g, protein_per_100g, carb_per_100g, fat_per_100g, fibre_per_100g, food_state, typical_cost_per_100g, is_verified',
     )
     .eq('id', entry.foodId)
     .single();
@@ -90,6 +90,9 @@ export async function logFood(input: unknown): Promise<LogResult> {
     fatPer100g: Number(foodRow.fat_per_100g),
     fibrePer100g: foodRow.fibre_per_100g == null ? null : Number(foodRow.fibre_per_100g),
     foodState: foodRow.food_state,
+    // Carried through so the estimate can widen for approximate data. Every
+    // seeded food is currently unverified, so this is almost always false.
+    verified: foodRow.is_verified === true,
   };
 
   // Household measures are resolved against the database, not against whatever

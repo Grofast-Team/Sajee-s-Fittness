@@ -107,12 +107,56 @@ describe('nutrition', () => {
     expect(n.proteinG).toBe(7);
   });
 
-  it('gives a point estimate only when the portion was measured', () => {
+  /*
+   * A point estimate needs two things, not one: the portion has to be
+   * measured *and* the composition data has to have been checked. Weighing an
+   * unverified food precisely tells you the mass, not the calories.
+   */
+  it('gives a point estimate when the portion is measured and the data is verified', () => {
     const portion = resolvePortion({ userGrams: 180 });
-    const est = estimateNutrition(dosa, portion);
+    const est = estimateNutrition({ ...dosa, verified: true }, portion);
     expect(est.confidence).toBe('high');
     expect(est.kcalLow).toBeNull();
     expect(est.display).toBe('302 kcal');
+  });
+
+  it('will not claim a point estimate for a weighed portion of unverified food', () => {
+    const portion = resolvePortion({ userGrams: 180 });
+    const est = estimateNutrition(dosa, portion);
+
+    expect(est.confidence).toBe('medium');
+    expect(est.kcalLow).not.toBeNull();
+    expect(est.display).toMatch(/^Estimated \d+–\d+ kcal$/);
+    // The band brackets the figure the density implies.
+    expect(est.kcalLow!).toBeLessThan(302);
+    expect(est.kcalHigh!).toBeGreaterThan(302);
+    // And it says why, rather than leaving the range unexplained.
+    expect(est.basis).toMatch(/approximate/i);
+  });
+
+  it('treats unverified as the default, because every seeded food is', () => {
+    // Omitting the flag must not quietly buy a food full confidence.
+    const portion = resolvePortion({ userGrams: 180 });
+    expect(estimateNutrition(dosa, portion).confidence).not.toBe('high');
+  });
+
+  it('widens a visual estimate further when the data is also unverified', () => {
+    const portion = resolvePortion({ visual: { grams: 200 } });
+    const unverified = estimateNutrition(dosa, portion);
+    const verified = estimateNutrition({ ...dosa, verified: true }, portion);
+
+    // Two uncertainties stacked must be wider than one alone.
+    const spread = (e: { kcalLow: number | null; kcalHigh: number | null }) =>
+      e.kcalHigh! - e.kcalLow!;
+    expect(spread(unverified)).toBeGreaterThan(spread(verified));
+  });
+
+  it('never reports a range that excludes the computed figure', () => {
+    for (const grams of [50, 180, 400]) {
+      const est = estimateNutrition(dosa, resolvePortion({ userGrams: grams }));
+      expect(est.kcalLow!).toBeLessThanOrEqual(est.kcal);
+      expect(est.kcalHigh!).toBeGreaterThanOrEqual(est.kcal);
+    }
   });
 
   it('renders a range, never false precision, for a visual estimate', () => {

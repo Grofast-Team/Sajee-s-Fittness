@@ -75,6 +75,8 @@ export async function GET(request: Request) {
       category: row.category,
       foodState: row.food_state,
       kcalPer100g: Number(row.kcal_per_100g),
+      // Drives whether the live estimate shows a figure or a range.
+      verified: row.is_verified === true,
       proteinPer100g: Number(row.protein_per_100g),
       carbPer100g: Number(row.carb_per_100g),
       fatPer100g: Number(row.fat_per_100g),
