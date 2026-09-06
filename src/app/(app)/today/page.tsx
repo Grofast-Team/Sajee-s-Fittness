@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { ArrowRight, UtensilsCrossed } from 'lucide-react';
-import { ConfidenceTag, EmptyState, Panel, Rail, Ring, Section, Stat, Why } from '@/components/ui';
+import { Alert, ConfidenceTag, EmptyState, Panel, Rail, Ring, Section, Stat, Why } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { SleepEntry, WaterEntry } from '@/components/quick-entry';
 import { NextStepCard } from '@/components/next-step';
 import { getDayView } from '@/lib/data/day';
 import { getNextStep } from '@/lib/data/next-step';
+import { getLastPlanChange } from '@/lib/data/plan-changes';
 import { greeting } from '@/lib/greeting';
 import { stepsToMinutes } from '@/lib/engines/steps';
 
@@ -27,7 +28,11 @@ export const metadata = { title: 'Today — FitCoach' };
  * layout with wider cards.
  */
 export default async function TodayPage() {
-  const [day, step] = await Promise.all([getDayView(), getNextStep()]);
+  const [day, step, planChange] = await Promise.all([
+    getDayView(),
+    getNextStep(),
+    getLastPlanChange(),
+  ]);
 
   const stepsShort = day.stepsToday === null ? null : Math.max(0, day.stepTarget - day.stepsToday);
 
@@ -61,6 +66,28 @@ export default async function TodayPage() {
           Here&rsquo;s your plan for today.
         </p>
       </header>
+
+      {/*
+       * A target that moved overnight has to say so.
+       *
+       * The weekly review can change someone's calorie target while they are
+       * asleep. Letting them find a different number with no explanation is
+       * the one thing a plan that calls itself adaptive must not do.
+       */}
+      {planChange?.isRecent ? (
+        <div className="mb-4 lg:mb-5">
+          <Alert
+            tone="info"
+            title={
+              planChange.deltaKcal !== 0
+                ? `Your daily target changed by ${planChange.deltaKcal > 0 ? '+' : ''}${planChange.deltaKcal} kcal`
+                : `Your step target changed by ${planChange.deltaSteps > 0 ? '+' : ''}${planChange.deltaSteps.toLocaleString()}`
+            }
+          >
+            {planChange.message}
+          </Alert>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-5">
         {/* ---------------- Left column: today's decisions ---------------- */}
