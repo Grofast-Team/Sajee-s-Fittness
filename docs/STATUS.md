@@ -4,7 +4,7 @@ An honest account of what exists, what is partial, and what has not been built.
 The brief's rule 98 applies to this document as much as to the UI: nothing is
 described as working that has not been run.
 
-Verified by `npm test` (191 passing), `npm run test:rls` (19 passing against a
+Verified by `npm test` (275 passing), `npm run test:rls` (19 passing against a
 live project), `npm run build` (clean), `eslint` (clean),
 and — as of this revision — **against a live Supabase project and a production
 Vercel deployment**, not only in sample mode.
@@ -12,9 +12,14 @@ Vercel deployment**, not only in sample mode.
 Live verification performed:
 
 - All 15 migrations applied to a fresh project, first attempt, no manual fixes
-- Migrations `20260903120001`–`20260903120004` (video system, progression
-  seeding, ladder fixes, level history) applied and committed. `supabase
-  migration list` is the authority on what is actually applied.
+- Migrations `20260903120001`–`20260903120007` (video system, progression
+  seeding, ladder fixes, level history, avoid-jumping, step segments, verified
+  flag in search) applied and committed. `supabase migration list` is the
+  authority on what is actually applied.
+- The adaptive loop run end to end against a real account: a session rated,
+  stored, and the level promoted exactly once — then held across three
+  reloads, which is the regression the `fitness_level_set_at` column exists to
+  prevent.
 - 51 foods, 71 aliases, 34 serving units, 12 exercises, 4 workouts, 6 lessons seeded
 - Alias search exercised against the real RPC: thosai/dosai/idly/sambhar/thayir/
   "meal maker" all resolve correctly; gibberish returns nothing
@@ -99,7 +104,8 @@ Live verification performed:
 | Perceived difficulty and pain capture | **Done** — `SessionFeedback` asks difficulty and pain separately, because hard is often correct while pain never is; `logSessionFeedback` writes `session_feedback`, which is the only signal the progression engine reads |
 | Video / progression engines | **Done**, tested — `progression.ts` and `video-recommendation.ts`. The library itself is empty: `videos` has no approved rows, so nothing is recommendable yet |
 | MET-based expenditure, net of resting | **Done**, tested |
-| Device integrations (Apple Health / Health Connect) | **Not built** — manual entry only, honestly labelled |
+| Video / progression **UI** | **Done** — "Your next step" chooses the session from level, equipment, injuries and today's available time; exercise demonstrations, post-session feedback, and a readiness checklist so "not yet" is legible |
+| Device integrations (Health Connect / HealthKit) | **Partial** — Capacitor shell, bridge, step-validity engine, schema and UI are built and tested; **never run on a device**, because there is no Android SDK here. The web path degrades honestly and says step sync needs the Android app |
 
 ## Phase 5 — AI
 
@@ -109,6 +115,7 @@ Live verification performed:
 | System prompts with hard guardrails | **Done** |
 | Scale-reading extraction contract | **Done** |
 | Photo analysis route: vision → DB match → portion → calc | **Done** — *never executed against a live model* |
+| Nutrition confidence reflects data quality, not just portion | **Done** — a weighed portion of an unverified food now reports a range, because the scale measures the mass and not the recipe |
 | Photo capture UI with scale instructions | **Done** |
 | Coach context builder | **Done** |
 | Coach chat endpoint | **Not built** — UI states this plainly |
@@ -129,8 +136,16 @@ reviews, grocery generation, travel mode and restaurant mode are **not built**.
 approximate values, marked `source = 'seed_approximate'`, `is_verified = false`,
 `data_confidence = 'medium'`. They are good enough to develop against and not
 good enough to ship. Each needs reconciling against IFCT 2017 (NIN/ICMR) or USDA
-FoodData Central. The provenance columns exist specifically so unverified data
-cannot masquerade as verified. Mixed dishes — sambar, chicken curry, biryani —
+FoodData Central.
+
+The provenance columns existed specifically so unverified data could not
+masquerade as verified — and until recently nothing read them. `is_verified`
+was written by the seed and referenced nowhere in the application, so weighing
+an unverified food produced a confident single figure and a "Weighed" badge.
+That is now fixed: the estimate widens to a range and drops to medium
+confidence whenever the composition data is unverified, which is currently
+every food in the database. Verifying a food therefore has a visible effect,
+which is the incentive that was missing. Mixed dishes — sambar, chicken curry, biryani —
 vary enormously by household, mostly through oil, and are marked `low`
 confidence for that reason.
 
@@ -161,17 +176,34 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
 1. **Curate the video library.** `videos` is empty and `review_status` defaults
    to `pending`, so `video-recommendation.ts` has nothing approved to return.
    The engine, the metadata and the review gate are all built; only the content
-   is missing.
-2. **Scheduled adaptation.** The adapt engine is built and tested but nothing
+   is missing. This needs a person to review real videos — it is deliberately
+   not something to generate, since the whole point of the review gate is that
+   a human has actually watched the thing.
+2. **Run the native shell on a device.** The Capacitor config, the Health
+   Connect bridge and the step-validity engine are written and typechecked
+   against the plugin's real definitions, but no Android SDK exists in this
+   environment, so none of it has executed. `npx cap add android`, a Health
+   Connect permissions block in the manifest, and a real phone.
+3. **Scheduled adaptation.** The adapt engine is built and tested but nothing
    runs it weekly, so intake and step targets never actually change.
    `progression.ts` owns the training lever separately, and does run.
-3. Verify the seed nutrition data.
-4. Coach chat endpoint.
-5. Test the photo pipeline against real scale photographs.
-6. Deprecate `workout_plans.rpe`. `session_feedback.difficulty` is now the
+4. Verify the seed nutrition data.
+5. Coach chat endpoint.
+6. Test the photo pipeline against real scale photographs.
+7. Deprecate `workout_plans.rpe`. `session_feedback.difficulty` is now the
    source of truth for how hard a session was, and `rpe` cannot distinguish
    "hard" from "hurts". It is unwritten but still present, so a future
    contributor may reasonably assume it is the column to use.
+
+A note on a whole class of bug found since. The onboarding wizard was asking
+six questions — the four fitness-assessment ones, "do you need to avoid
+jumping?", and shift start/end times — whose answers the save schema did not
+accept, so Zod stripped them silently. Nothing failed and nothing was logged;
+every user was assessed from nothing and landed on the default level while the
+interface implied otherwise. `tests/onboarding-schema.test.ts` now asserts that
+every field the wizard asks about has somewhere to land, and it found the shift
+times on its first run. Worth remembering that the most durable defects here
+have been silent ones, not crashes.
 
 Three items have left this list. Workout completion and difficulty capture
 both shipped. Sleep entry was listed as having no UI long after `SleepEntry`
