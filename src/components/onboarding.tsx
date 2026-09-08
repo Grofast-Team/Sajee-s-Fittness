@@ -6,6 +6,8 @@ import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { Alert, Button, Panel, Why } from '@/components/ui';
 import { STEPS, visibleFields, type Field } from '@/lib/onboarding-steps';
 import { saveOnboarding } from '@/lib/actions/onboarding';
+import { DayMapBuilder } from '@/components/day-map-builder';
+import type { DayEntry } from '@/lib/engines/day-map';
 import { deriveActivityLevel, estimateBmr, estimateTdee } from '@/lib/engines/energy';
 import { computeEnergyTarget, computeMacros, waterTargetMl } from '@/lib/engines/targets';
 import { initialStepGoal } from '@/lib/engines/steps';
@@ -217,7 +219,12 @@ function FieldInput({
       ) : null}
 
       <div className="mt-2.5">
-        {field.type === 'choice' ? (
+        {field.type === 'day_map' ? (
+          <DayMapBuilder
+            value={value as DayEntry[] | undefined}
+            onChange={(entries) => onChange(entries)}
+          />
+        ) : field.type === 'choice' ? (
           <div className="flex flex-wrap gap-2">
             {field.options?.map((o) => (
               <Chip key={o.value} selected={value === o.value} onClick={() => onChange(o.value)}>

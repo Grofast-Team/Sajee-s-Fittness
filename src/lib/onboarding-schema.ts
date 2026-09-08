@@ -30,6 +30,22 @@ export const answersSchema = z.object({
 
   workPattern: z.string().optional(),
   sittingHours: z.coerce.number().min(0).max(24).optional(),
+  /**
+   * The day narrative, which replaces asking people to rate their own
+   * activity. Validated structurally here; the energy figure is derived
+   * server-side so a client cannot post its own activity factor.
+   */
+  dayMap: z
+    .array(
+      z.object({
+        slot: z.enum(['early_morning', 'morning', 'midday', 'afternoon', 'evening', 'night']),
+        activityId: z.string().max(40),
+        minutes: z.coerce.number().min(0).max(1440),
+      }),
+    )
+    .max(120)
+    .default([]),
+
   nightShift: z.string().optional(),
   // Asked of shift workers, and previously dropped here. `lifestyle` has had
   // work_start/work_end columns waiting for them the whole time.

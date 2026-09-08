@@ -8,6 +8,7 @@ import { computeEnergyTarget, computeMacros, waterTargetMl } from '@/lib/engines
 import { initialStepGoal } from '@/lib/engines/steps';
 import { restrictionsFrom, screen } from '@/lib/engines/safety';
 import { assessFitnessLevel, type FitnessLevel } from '@/lib/engines/progression';
+import { derivePalFromDay } from '@/lib/engines/day-map';
 import { answersSchema } from '@/lib/onboarding-schema';
 import type { BodyInput, Pace, Sex } from '@/lib/engines/types';
 
@@ -93,6 +94,15 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
   });
   const restrictions = [...restrictionsFrom(flags)];
 
+  /*
+   * Activity from the described day, not from a self-rating.
+   *
+   * When the user has described enough of their day we use the PAL that falls
+   * out of it. `deriveActivityLevel` stays as the fallback for anyone who
+   * skipped the day map, so nobody is blocked by an optional question.
+   */
+  const dayMap = derivePalFromDay(a.dayMap);
+
   const activity = deriveActivityLevel({
     workPattern: a.workPattern as never,
     sittingHours: a.sittingHours,
@@ -100,7 +110,9 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
     trainingDaysPerWeek: a.trainingDays ?? 0,
   });
   const bmr = estimateBmr(body);
-  const tdee = estimateTdee(bmr.kcal, activity.level);
+  const tdee = dayMap.insufficient
+    ? estimateTdee(bmr.kcal, activity.level)
+    : Math.round(bmr.kcal * dayMap.pal);
   const energy = computeEnergyTarget(body, bmr.kcal, tdee, a.pace as Pace, { restrictions });
   const macros = computeMacros(body, energy.targetKcal, { goalWeightKg: a.targetWeightKg });
   const steps = initialStepGoal({ baselineSteps: a.baselineSteps ?? 3000, restrictions });
@@ -158,7 +170,6 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
         {
           user_id: userId,
           work_pattern: a.workPattern ?? null,
-          sitting_hours: a.sittingHours ?? null,
           night_shift: isYes(a.nightShift),
           work_start: a.shiftStart || null,
           work_end: a.shiftEnd || null,
@@ -173,6 +184,11 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
           session_minutes_available: a.sessionMinutes ?? null,
           injuries: toList(a.injuries),
           avoid_jumping: isYes(a.apartmentOnly),
+          // Kept raw so the factor can be recomputed if MET values change.
+          day_map: a.dayMap,
+          derived_pal: dayMap.insufficient ? null : dayMap.pal,
+          // Still derived from the day map, for anything that reads hours sat.
+          sitting_hours: dayMap.insufficient ? (a.sittingHours ?? null) : seatedHoursFrom(dayMap),
         },
         { onConflict: 'user_id' },
       ),
@@ -321,4 +337,18 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
 
   revalidatePath('/', 'layout');
   return { ok: true };
+}
+
+/**
+ * Hours a day spent seated, read off the described day.
+ *
+ * Replaces asking "roughly how many hours do you sit?", which people answer
+ * badly — it is a question about a whole day, asked in the abstract, and the
+ * honest answer for most people is that they have never counted.
+ */
+function seatedHoursFrom(dayMap: ReturnType<typeof derivePalFromDay>): number {
+  const seated = dayMap.breakdown
+    .filter((b) => b.met <= 1.5 && b.label !== 'Sleeping')
+    .reduce((sum, b) => sum + b.hours, 0);
+  return Math.round(seated * 10) / 10;
 }

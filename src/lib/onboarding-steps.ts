@@ -15,7 +15,16 @@
  *      beats an abandoned perfect one.
  */
 
-export type FieldType = 'text' | 'number' | 'choice' | 'multi' | 'time' | 'boolean' | 'scale';
+export type FieldType =
+  | 'text'
+  | 'number'
+  | 'choice'
+  | 'multi'
+  | 'time'
+  | 'boolean'
+  | 'scale'
+  /** The day narrative. See src/lib/engines/day-map.ts. */
+  | 'day_map';
 
 export interface Field {
   id: string;
@@ -140,12 +149,32 @@ export const STEPS: Step[] = [
   {
     id: 'work',
     title: 'Your day',
-    intro: 'This is how we work out what you burn, rather than asking you to rate your own activity — almost everyone overestimates that.',
+    intro:
+      'Rather than asking you to rate your own activity, we ask what you actually do. ' +
+      'Walk through a normal day and we work the rest out from that — most people who describe ' +
+      'their day honestly turn out to be more active than they would have called themselves.',
     fields: [
       {
+        id: 'dayMap',
+        label: 'Walk me through a normal day',
+        type: 'day_map',
+        because:
+          'Cooking, housework, standing at a counter and carrying a child are real work that a ' +
+          'step counter never sees. Describing the day is the only way we find them.',
+      },
+      /*
+       * Kept, but no longer the basis of anything.
+       *
+       * `workPattern` used to drive the activity estimate on its own. It now
+       * only shapes scheduling — a shift worker needs sessions at different
+       * hours — while the energy side comes from the day map, which is
+       * evidence rather than self-classification.
+       */
+      {
         id: 'workPattern',
-        label: 'What is your work like?',
+        label: 'Which of these fits your work best?',
         type: 'choice',
+        because: 'Only used to schedule your sessions at hours that suit you.',
         options: [
           { value: 'desk', label: 'Mostly sitting' },
           { value: 'mixed', label: 'A mix of sitting and moving' },
@@ -156,7 +185,6 @@ export const STEPS: Step[] = [
           { value: 'student', label: 'Student' },
         ],
       },
-      { id: 'sittingHours', label: 'Roughly how many hours a day do you sit?', type: 'number', unit: 'hours', min: 0, max: 24 },
       { id: 'nightShift', label: 'Do you work nights?', type: 'choice', options: yesNo, showIf: (a) => a.workPattern === 'shift' },
       { id: 'shiftStart', label: 'When does your shift start?', type: 'time', showIf: (a) => a.nightShift === 'yes' },
       { id: 'shiftEnd', label: 'When does it end?', type: 'time', showIf: (a) => a.nightShift === 'yes' },
