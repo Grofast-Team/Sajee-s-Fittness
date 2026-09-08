@@ -8,8 +8,7 @@ import {
   House,
   MessageCircleHeart,
   Settings,
-  TrendingUp,
-} from 'lucide-react';
+  TrendingUp, Wallet, } from 'lucide-react';
 import { clsx } from 'clsx';
 
 /**
@@ -28,6 +27,7 @@ const ITEMS = [
   { href: '/today', label: 'Today', Icon: House },
   { href: '/food', label: 'Food', Icon: Apple },
   { href: '/activity', label: 'Activity', Icon: Footprints },
+  { href: '/money', label: 'Money', Icon: Wallet },
   { href: '/progress', label: 'Progress', Icon: TrendingUp },
   { href: '/coach', label: 'Coach', Icon: MessageCircleHeart },
 ] as const;
