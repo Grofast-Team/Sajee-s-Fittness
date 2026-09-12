@@ -71,7 +71,7 @@ Live verification performed:
 | Step entry (`logSteps`) | **Done** — source recorded, device beats manual |
 | Water entry (`logWater`) | **Done** — one tap per glass, optimistic with rollback |
 | Sleep entry (`logSleep`) | **Done** — `SleepEntry` on Today takes hours and quality, so `daily_logs.sleep_minutes` is populated and the adherence engine's sleep component scores from real data |
-| Running adaptation on a schedule | **Not built** |
+| Running adaptation on a schedule | **Done** — `/api/cron/review` runs `adapt()` for every active plan, scheduled weekly in `vercel.ts`, behind a `CRON_SECRET` that fails closed. Applying a change writes a new plan *version* and Today announces it, because a target that moves overnight has to say so |
 
 ## Phase 3 — Food
 
@@ -184,9 +184,9 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
    against the plugin's real definitions, but no Android SDK exists in this
    environment, so none of it has executed. `npx cap add android`, a Health
    Connect permissions block in the manifest, and a real phone.
-3. **Scheduled adaptation.** The adapt engine is built and tested but nothing
-   runs it weekly, so intake and step targets never actually change.
-   `progression.ts` owns the training lever separately, and does run.
+3. **Editing a logged food entry.** You can add one and delete one, but not
+   correct one. Mistyping 180 g as 1800 g currently costs a delete and a
+   re-entry, in the flow people touch most often.
 4. Verify the seed nutrition data.
 5. Coach chat endpoint.
 6. Test the photo pipeline against real scale photographs.

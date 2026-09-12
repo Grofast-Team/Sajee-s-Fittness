@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Trash2, UtensilsCrossed } from 'lucide-react';
-import { Alert, Button, ConfidenceTag, EmptyState } from '@/components/ui';
-import { deleteFoodLog } from '@/lib/actions/food';
+import { Pencil, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Alert, Button, ConfidenceTag, EmptyState, inputClass, inputStyle } from '@/components/ui';
+import { deleteFoodLog, updateFoodLog } from '@/lib/actions/food';
 import type { LoggedItem } from '@/lib/data/day';
 
 /**
- * Today's logged meals, with the ability to remove one.
+ * Today's logged meals, with the ability to correct or remove one.
+ *
+ * Correcting matters more than deleting, and was missing for longer: you could
+ * add an entry and delete one, but not fix one, so a mistyped 1800 g cost a
+ * delete and a full re-entry in the flow people touch most often.
  *
  * Being able to delete matters more than it looks. A mis-logged entry is not
  * just an annoying wrong number on screen: it feeds `daily_logs`, which feeds
@@ -17,6 +21,8 @@ import type { LoggedItem } from '@/lib/data/day';
  */
 export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: boolean }) {
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -66,22 +72,113 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                 </div>
 
                 {canEdit ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirming(confirming === entry.id ? null : entry.id);
-                      setError(null);
-                    }}
-                    aria-label={`Remove ${entry.description}`}
-                    aria-expanded={confirming === entry.id}
-                    className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] transition-colors duration-200"
-                    style={{ color: 'var(--fg-subtle)' }}
-                  >
-                    <Trash2 size={16} aria-hidden />
-                  </button>
+                  <>
+                    {/* Correcting a portion is far more common than deleting
+                        one, so it gets its own control rather than forcing a
+                        delete-and-retype. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditing(editing === entry.id ? null : entry.id);
+                        setDraft(String(entry.quantity));
+                        setConfirming(null);
+                        setError(null);
+                      }}
+                      aria-label={`Change the amount for ${entry.description}`}
+                      aria-expanded={editing === entry.id}
+                      className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] transition-colors duration-200"
+                      style={{ color: 'var(--fg-subtle)' }}
+                    >
+                      <Pencil size={16} aria-hidden />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirming(confirming === entry.id ? null : entry.id);
+                        setEditing(null);
+                        setError(null);
+                      }}
+                      aria-label={`Remove ${entry.description}`}
+                      aria-expanded={confirming === entry.id}
+                      className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] transition-colors duration-200"
+                      style={{ color: 'var(--fg-subtle)' }}
+                    >
+                      <Trash2 size={16} aria-hidden />
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>
+
+            {/* Inline, and prefilled with what was entered — the common case
+                is a digit wrong, not a number to retype from scratch. */}
+            {editing === entry.id ? (
+              <form
+                className="mt-3 flex flex-wrap items-end gap-2 p-3"
+                style={{ background: 'var(--bg)', borderRadius: 'var(--radius-control)' }}
+                onSubmit={(ev) => {
+                  ev.preventDefault();
+                  const amount = Number(draft);
+                  if (!Number.isFinite(amount) || amount <= 0) {
+                    setError('Enter an amount greater than zero.');
+                    return;
+                  }
+
+                  startTransition(async () => {
+                    const result = await updateFoodLog(
+                      entry.unitLabel === 'g'
+                        ? { id: entry.id, grams: amount }
+                        : {
+                            id: entry.id,
+                            serving: { unitLabel: entry.unitLabel, count: amount },
+                          },
+                    );
+                    if (!result.ok) setError(result.error);
+                    else setEditing(null);
+                  });
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <label
+                    htmlFor={`amount-${entry.id}`}
+                    className="block text-[13px] font-medium"
+                  >
+                    {entry.unitLabel === 'g' ? 'Weight' : `How many ${entry.unitLabel}?`}
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      id={`amount-${entry.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      autoFocus
+                      min={0}
+                      step={entry.unitLabel === 'g' ? 1 : 0.5}
+                      value={draft}
+                      onChange={(ev) => setDraft(ev.target.value)}
+                      className={`data ${inputClass}`}
+                      style={{ ...inputStyle, maxWidth: 120 }}
+                    />
+                    <span className="text-sm" style={{ color: 'var(--fg-subtle)' }}>
+                      {entry.unitLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <Button type="submit" size="sm" disabled={pending}>
+                  {pending ? 'Saving…' : 'Save'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => setEditing(null)}
+                >
+                  Cancel
+                </Button>
+              </form>
+            ) : null}
 
             {/* Confirmation is inline rather than a modal: it keeps the entry
                 you are about to remove visible while you decide. */}

@@ -28,6 +28,9 @@ export interface LoggedItem {
   kcalHigh: number | null;
   confidence: Confidence;
   portionBasis: string;
+  /** The portion as entered, so an edit can start from what the user typed. */
+  quantity: number;
+  unitLabel: string;
 }
 
 export interface Constraints {
@@ -143,6 +146,10 @@ function sampleDay(): DayView {
       kcalHigh: null,
       confidence: e.confidence,
       portionBasis: e.basis,
+      // Sample rows are illustrative and not editable, so the portion here is
+      // only ever a placeholder.
+      quantity: 0,
+      unitLabel: 'g',
     })),
     trend: plan.trend,
     rationale: {
@@ -190,7 +197,7 @@ export async function getDayView(date?: string): Promise<DayView> {
       .maybeSingle(),
     supabase
       .from('food_logs')
-      .select('id, meal, description, kcal, protein_g, kcal_low, kcal_high, confidence, portion_basis, logged_at')
+      .select('id, meal, description, kcal, protein_g, kcal_low, kcal_high, confidence, portion_basis, quantity, unit_label, logged_at')
       .eq('user_id', userId)
       .eq('log_date', logDate)
       .order('logged_at', { ascending: true }),
@@ -305,6 +312,8 @@ export async function getDayView(date?: string): Promise<DayView> {
       kcalHigh: row.kcal_high == null ? null : Math.round(Number(row.kcal_high)),
       confidence: row.confidence as Confidence,
       portionBasis: row.portion_basis as string,
+      quantity: Number(row.quantity ?? 0),
+      unitLabel: (row.unit_label as string) ?? 'g',
     })),
     trend: analyseTrend(weighIns),
     rationale: {
