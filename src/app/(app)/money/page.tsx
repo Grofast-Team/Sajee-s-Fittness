@@ -2,7 +2,9 @@ import { Panel, PageHeader, Ring, Section, Why } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { SpendEntry } from '@/components/spend-entry';
 import { MonthlyLimit } from '@/components/monthly-limit';
+import { FoodSpendPanel } from '@/components/food-spend-panel';
 import { getMoneyMonth } from '@/lib/data/money';
+import { getFoodSpend } from '@/lib/data/food-spend';
 import { CATEGORIES, categoryLabel, formatRupees, type CategoryTotal } from '@/lib/engines/money';
 
 /**
@@ -61,6 +63,16 @@ const EMOJI = new Map(CATEGORIES.map((c) => [c.id, c.emoji]));
 export default async function MoneyPage() {
   const view = await getMoneyMonth();
   const { summary, window } = view;
+
+  /*
+   * The food estimate covers the month *so far*, not the whole month.
+   *
+   * `window.end` is exclusive and sits in the future mid-month; using it would
+   * pro-rate the food budget across days that have not happened and make every
+   * month look under budget until the last day of it.
+   */
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const foodSpend = await getFoodSpend(window.start, todayIso);
 
   const spent = summary.totalPaise;
   const limit = summary.limitPaise;
@@ -173,6 +185,13 @@ export default async function MoneyPage() {
               )}
             </Section>
           </Panel>
+
+          {/* Beside the spending, never inside it — see FoodSpendPanel. */}
+          {foodSpend ? (
+            <Panel>
+              <FoodSpendPanel view={foodSpend} />
+            </Panel>
+          ) : null}
 
           <Panel>
             <Section

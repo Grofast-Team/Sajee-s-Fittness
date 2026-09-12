@@ -121,6 +121,27 @@ Live verification performed:
 | Coach chat endpoint | **Not built** — UI states this plainly |
 | Voice logging | **Not built** — schema ready, shown as unavailable |
 
+## Money
+
+| Item | Status |
+| --- | --- |
+| Spend recording, categories, monthly limit | **Done** — built in a parallel session (`fbe20e9`); amounts are integers in paise, RLS on both tables |
+| Food cost surfaced from the meal log | **Done** — `food_logs.cost` had been written on every entry since food logging existed and read nowhere, and the onboarding food budget was only ever displayed back as a static string. The money screen now shows what the month's logged meals are worth |
+| Editing a recorded spend | **Not built** — same gap food logging had until `f7f07a6`: you can add and delete but not correct |
+
+Two rules the food estimate is built on, both worth keeping:
+
+- **It is never added to the spend total.** Someone who logs their meals *and*
+  records a grocery shop has described the same money twice; summing them
+  would inflate their spending and then, since the screen compares against a
+  monthly limit, report an overspend that did not happen.
+- **It will not compare against the budget off a partial log.** `cost` comes
+  from a seeded price table with no provenance, and the estimate can only see
+  food that was entered. With 30% of a day's energy logged, "₹133 a day under
+  budget" is arithmetically right and substantively false — confidently wrong
+  in the direction that tells someone to spend more. Below two thirds
+  coverage the comparison is withheld and the reason given.
+
 ## Phase 6–8 — Adherence, advanced, production
 
 Schema exists for habits, reviews, notifications, feedback, grocery lists,
