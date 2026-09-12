@@ -4,9 +4,11 @@ import { Alert, ConfidenceTag, EmptyState, Panel, Rail, Ring, Section, Stat, Why
 import { SampleBanner } from '@/components/sample-banner';
 import { SleepEntry, WaterEntry } from '@/components/quick-entry';
 import { NextStepCard } from '@/components/next-step';
+import { Inbox } from '@/components/inbox';
 import { getDayView } from '@/lib/data/day';
 import { getNextStep } from '@/lib/data/next-step';
 import { getLastPlanChange } from '@/lib/data/plan-changes';
+import { getInbox } from '@/lib/data/notifications';
 import { greeting } from '@/lib/greeting';
 import { stepsToMinutes } from '@/lib/engines/steps';
 
@@ -28,10 +30,11 @@ export const metadata = { title: 'Today — FitCoach' };
  * layout with wider cards.
  */
 export default async function TodayPage() {
-  const [day, step, planChange] = await Promise.all([
+  const [day, step, planChange, inbox] = await Promise.all([
     getDayView(),
     getNextStep(),
     getLastPlanChange(),
+    getInbox(),
   ]);
 
   const stepsShort = day.stepsToday === null ? null : Math.max(0, day.stepTarget - day.stepsToday);
@@ -66,6 +69,9 @@ export default async function TodayPage() {
           Here&rsquo;s your plan for today.
         </p>
       </header>
+
+      {/* Renders nothing when there is nothing to say, which is most days. */}
+      <Inbox items={inbox} />
 
       {/*
        * A target that moved overnight has to say so.

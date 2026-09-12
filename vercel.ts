@@ -25,6 +25,17 @@ export const config: VercelConfig = {
       path: '/api/cron/review',
       schedule: '30 2 * * 1',
     },
+    {
+      /*
+       * Daily, because what it watches moves daily: a bill due in three days
+       * cannot be caught by a job that runs on Mondays.
+       *
+       * 01:30 UTC is 07:00 in India — before most people open the app, so a
+       * reminder is waiting rather than arriving while they read.
+       */
+      path: '/api/cron/daily',
+      schedule: '30 1 * * *',
+    },
   ],
 };
 
