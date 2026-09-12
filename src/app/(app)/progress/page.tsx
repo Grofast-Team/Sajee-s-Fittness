@@ -5,6 +5,8 @@ import { TrendChart } from '@/components/trend-chart';
 import { getDayView } from '@/lib/data/day';
 import { explainShortTermChange } from '@/lib/engines/trend';
 import { detectPlateau } from '@/lib/engines/adaptation';
+import { getPatterns } from '@/lib/data/patterns';
+import { PatternsPanel } from '@/components/patterns-panel';
 import { scoreAdherence } from '@/lib/engines/adherence';
 
 export const metadata = { title: 'Progress — FitCoach' };
@@ -20,7 +22,7 @@ export const metadata = { title: 'Progress — FitCoach' };
  * chart is a misleading one — the same slope reads as steeper in a narrow box.
  */
 export default async function ProgressPage() {
-  const day = await getDayView();
+  const [day, patterns] = await Promise.all([getDayView(), getPatterns()]);
   const { trend } = day;
   const points = trend.points;
 
@@ -139,7 +141,17 @@ export default async function ProgressPage() {
         )}
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-5">
+      {/* Full width: a finding is a sentence, and a sentence in a half column
+          beside a form reads as a caption rather than a result. */}
+      {patterns ? (
+        <div className="mt-4 lg:mt-5">
+          <Panel>
+            <PatternsPanel result={patterns} />
+          </Panel>
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid gap-4 lg:mt-5 lg:grid-cols-2 lg:items-start lg:gap-5">
         <div className="space-y-4 lg:space-y-5">
           <Panel>
             <Section title="Record a weight">
