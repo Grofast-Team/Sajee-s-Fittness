@@ -90,8 +90,8 @@ Live verification performed:
 | ~50 Indian foods, 70 aliases, 34 serving units, 17 substitutions | **Done** — *unverified values, see below* |
 | Daily rollup triggers | **Done** (SQL) |
 | Recipes schema + nutrition derivation | **Done** (SQL); **no recipe seed data yet** |
-| Quick add | **Not built** — button present and correctly disabled |
-| Editing a logged entry | **Not built** |
+| Quick add | **Done** — the foods you log most, replayed in one tap. Ordered by how often each has been logged, and keyed on food *and* portion so 150 g and 250 g of the same thing stay separate choices |
+| Editing a logged entry | **Done** — `updateFoodLog` changes the quantity or the meal and recomputes nutrition through the same path the insert uses; the rollup trigger already handled UPDATE, so the day's totals follow |
 | Barcode scanning | **Not built** — shown as unavailable |
 
 ## Phase 4 — Activity
@@ -184,10 +184,7 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
    against the plugin's real definitions, but no Android SDK exists in this
    environment, so none of it has executed. `npx cap add android`, a Health
    Connect permissions block in the manifest, and a real phone.
-3. **Editing a logged food entry.** You can add one and delete one, but not
-   correct one. Mistyping 180 g as 1800 g currently costs a delete and a
-   re-entry, in the flow people touch most often.
-4. Verify the seed nutrition data.
+3. Verify the seed nutrition data.
 5. Coach chat endpoint.
 6. Test the photo pipeline against real scale photographs.
 7. Deprecate `workout_plans.rpe`. `session_feedback.difficulty` is now the

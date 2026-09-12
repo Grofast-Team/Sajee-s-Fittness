@@ -1,10 +1,12 @@
-import { Barcode, Mic, Zap } from 'lucide-react';
+import { Barcode, Mic } from 'lucide-react';
 import { Panel, PageHeader, Rail, Ring, Section, Unavailable } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { ScalePhotoLogger } from '@/components/scale-photo';
 import { FoodSearch } from '@/components/food-search';
 import { LoggedMeals } from '@/components/logged-meals';
+import { QuickAdd } from '@/components/quick-add';
 import { getDayView } from '@/lib/data/day';
+import { getRecentFoods } from '@/lib/data/recent-foods';
 import { aiConfigured, supabaseConfigured } from '@/lib/config';
 
 export const metadata = { title: 'Food — FitCoach' };
@@ -19,7 +21,7 @@ export const metadata = { title: 'Food — FitCoach' };
  * order: how much is left, then how to add to it, then what has been added.
  */
 export default async function FoodPage() {
-  const day = await getDayView();
+  const [day, recentFoods] = await Promise.all([getDayView(), getRecentFoods()]);
   const remaining = day.remaining.kcalRemaining;
   const over = remaining < 0;
 
@@ -46,6 +48,21 @@ export default async function FoodPage() {
                 />
               )}
 
+              {/* Above search on purpose: for a repeat meal this is one tap,
+                  and the fastest path should be the one you reach first. It
+                  renders nothing at all until there is a history to offer. */}
+              {recentFoods.length > 0 ? (
+                <div className="mt-6 border-t pt-6" style={{ borderColor: 'var(--line)' }}>
+                  <h3 className="text-sm font-semibold">Quick add</h3>
+                  <div className="mt-2">
+                    <QuickAdd
+                      items={recentFoods}
+                      canLog={supabaseConfigured && !day.isSample}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
               <div className="mt-6 border-t pt-6" style={{ borderColor: 'var(--line)' }}>
                 <FoodSearch canSave={supabaseConfigured && !day.isSample} />
               </div>
@@ -56,7 +73,6 @@ export default async function FoodPage() {
             <Section title="Not built yet">
               <ul className="space-y-3">
                 {[
-                  { Icon: Zap, label: 'Quick add', detail: 'Food, quantity, meal — ten seconds.' },
                   {
                     Icon: Mic,
                     label: 'Say what you ate',
