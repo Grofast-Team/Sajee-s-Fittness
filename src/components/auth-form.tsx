@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Alert, Button, Field, Panel, inputClass, inputStyle } from '@/components/ui';
 import { signIn, signUp, type AuthState } from '@/lib/actions/auth';
 
@@ -14,6 +14,7 @@ import { signIn, signUp, type AuthState } from '@/lib/actions/auth';
  */
 export function AuthForm({ configured }: { configured: boolean }) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [showPassword, setShowPassword] = useState(false);
   const action = mode === 'signin' ? signIn : signUp;
   const [state, formAction, pending] = useActionState<AuthState, FormData>(action, {});
 
@@ -29,7 +30,11 @@ export function AuthForm({ configured }: { configured: boolean }) {
             <button
               key={m}
               type="button"
-              onClick={() => setMode(m)}
+              onClick={() => {
+                setMode(m);
+                // Never carry a revealed password across a mode switch.
+                setShowPassword(false);
+              }}
               aria-pressed={on}
               className="min-h-10 flex-1 cursor-pointer rounded-lg text-sm font-semibold transition-colors duration-200"
               style={{
@@ -77,16 +82,45 @@ export function AuthForm({ configured }: { configured: boolean }) {
           htmlFor="password"
           description={mode === 'signup' ? 'At least 8 characters.' : undefined}
         >
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            className={inputClass}
-            style={inputStyle}
-          />
+          {/*
+           * Let people see what they typed.
+           *
+           * Masking helps nobody signing up alone on a phone: it turns a
+           * mistyped character into a failed login they cannot diagnose, and a
+           * long password into something people avoid choosing. Revealing is
+           * opt-in, starts hidden, and resets to hidden when the form switches
+           * mode so a password is never left on screen unexpectedly.
+           */}
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              required
+              minLength={8}
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              className={inputClass}
+              // Room for the button, so a long password never runs underneath it.
+              style={{ ...inputStyle, paddingRight: 48 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((shown) => !shown)}
+              // The label says what pressing it will do, and announces the
+              // current state, because the icon alone carries neither.
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
+              // 44px target: this gets tapped one-handed.
+              className="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center"
+              style={{ color: 'var(--fg-subtle)' }}
+            >
+              {showPassword ? (
+                <EyeOff size={18} aria-hidden />
+              ) : (
+                <Eye size={18} aria-hidden />
+              )}
+            </button>
+          </div>
         </Field>
 
         {state.error ? <Alert tone="error">{state.error}</Alert> : null}
