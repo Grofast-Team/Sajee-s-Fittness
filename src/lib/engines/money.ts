@@ -318,7 +318,13 @@ function buildMessage(input: {
   if (projectedPaise > limitPaise * 1.05) {
     return (
       `${formatRupees(remainingPaise ?? 0)} left for ${window.daysLeft} more days. At the rate ` +
-      `you have been going this month you would finish around ${formatRupees(projectedPaise)}, ` +
+      // Rounded to whole rupees. A projection reported to the paise —
+      // "you would finish around ₹50,000.10" — claims a precision the
+      // arithmetic behind it does not have, which is exactly the false
+      // precision this app refuses everywhere else.
+      `you have been going this month you would finish around ${formatRupees(
+        Math.round(projectedPaise / 100) * 100,
+      )}, ` +
       `which is over your limit. That is a projection, not a prediction — rent and one-off bills ` +
       `push it up early in the month.`
     );

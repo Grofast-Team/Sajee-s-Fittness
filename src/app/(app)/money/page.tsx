@@ -3,8 +3,10 @@ import { SampleBanner } from '@/components/sample-banner';
 import { SpendEntry } from '@/components/spend-entry';
 import { MonthlyLimit } from '@/components/monthly-limit';
 import { FoodSpendPanel } from '@/components/food-spend-panel';
+import { CommitmentsPanel } from '@/components/commitments-panel';
 import { getMoneyMonth } from '@/lib/data/money';
 import { getFoodSpend } from '@/lib/data/food-spend';
+import { getCommitments } from '@/lib/data/commitments';
 import { CATEGORIES, categoryLabel, formatRupees, type CategoryTotal } from '@/lib/engines/money';
 
 /**
@@ -72,7 +74,21 @@ export default async function MoneyPage() {
    * month look under budget until the last day of it.
    */
   const todayIso = new Date().toISOString().slice(0, 10);
-  const foodSpend = await getFoodSpend(window.start, todayIso);
+  const [foodSpend, commitments] = await Promise.all([
+    getFoodSpend(window.start, todayIso),
+    /*
+     * `summary.totalPaise` already includes any commitment settled this month,
+     * because paying one writes an ordinary spend. The engine subtracts only
+     * what is still *outstanding*, so nothing is counted twice.
+     */
+    getCommitments(
+      window.start,
+      window.end,
+      summary.limitPaise,
+      summary.totalPaise,
+      window.daysLeft,
+    ),
+  ]);
 
   const spent = summary.totalPaise;
   const limit = summary.limitPaise;
@@ -147,6 +163,14 @@ export default async function MoneyPage() {
               ) : null}
             </div>
           </Panel>
+
+          {/* Directly under the headline figure, because it corrects it: what
+              is left is not what is free until the rent is set aside. */}
+          {commitments ? (
+            <Panel>
+              <CommitmentsPanel summary={commitments} canEdit={!view.isSample} />
+            </Panel>
+          ) : null}
 
           <Panel>
             <Section title="Add a spend">

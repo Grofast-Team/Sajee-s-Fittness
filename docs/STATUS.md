@@ -127,6 +127,7 @@ Live verification performed:
 | --- | --- |
 | Spend recording, categories, monthly limit | **Done** — built in a parallel session (`fbe20e9`); amounts are integers in paise, RLS on both tables |
 | Food cost surfaced from the meal log | **Done** — `food_logs.cost` had been written on every entry since food logging existed and read nowhere, and the onboarding food budget was only ever displayed back as a static string. The money screen now shows what the month's logged meals are worth |
+| Recurring commitments — rent, bills, EMI, subscriptions | **Done** — `commitments` holds the plan; settling one writes an ordinary `spends` row carrying `commitment_id`, so there is one ledger and "is the rent paid" is answered from it. Turns the screen from "what has gone out" into "what is genuinely free" |
 | Editing a recorded spend | **Not built** — same gap food logging had until `f7f07a6`: you can add and delete but not correct |
 
 Two rules the food estimate is built on, both worth keeping:
