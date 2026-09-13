@@ -854,6 +854,147 @@ suite('Row Level Security', () => {
     }, 60_000);
   });
 
+  // --- kitchen stock ------------------------------------------------------
+
+  describe('kitchen stock keeps to its owner', () => {
+    let eggFoodId: string;
+    let aliceEggsId: string;
+    let aliceLogId: string;
+    let bobLogId: string;
+    let bobSpendId: string;
+
+    beforeAll(async () => {
+      const { data: egg } = await alice.client.from('foods').select('id').eq('slug', 'egg-whole-boiled').single();
+      eggFoodId = egg!.id as string;
+
+      const [{ data: eggs, error: eggsError }, { data: aliceLog }, { data: bobLog }, { data: bobSpend }] =
+        await Promise.all([
+          alice.client
+            .from('pantry_items')
+            .insert({ user_id: alice.id, label: 'alice eggs', food_id: eggFoodId, unit: 'piece', grams_per_unit: 50 })
+            .select('id')
+            .single(),
+          alice.client
+            .from('food_logs')
+            .insert({ user_id: alice.id, food_id: eggFoodId, description: '2 eggs', quantity: 2, unit_label: 'piece', grams: 100, kcal: 155 })
+            .select('id')
+            .single(),
+          bob.client
+            .from('food_logs')
+            .insert({ user_id: bob.id, food_id: eggFoodId, description: 'bob eggs', quantity: 2, unit_label: 'piece', grams: 100, kcal: 155 })
+            .select('id')
+            .single(),
+          bob.client
+            .from('spends')
+            .insert({ user_id: bob.id, amount_paise: 8_400, category: 'groceries' })
+            .select('id')
+            .single(),
+        ]);
+      expect(eggsError).toBeNull();
+      aliceEggsId = eggs!.id as string;
+      aliceLogId = aliceLog!.id as string;
+      bobLogId = bobLog!.id as string;
+      bobSpendId = bobSpend!.id as string;
+
+      const { error } = await alice.client
+        .from('pantry_movements')
+        .insert({ user_id: alice.id, item_id: aliceEggsId, kind: 'bought', quantity: 12, note: 'alice private shop' });
+      expect(error).toBeNull();
+    }, 60_000);
+
+    it('never shows Bob Alice’s kitchen', async () => {
+      for (const table of ['pantry_items', 'pantry_movements']) {
+        const { data, error } = await bob.client.from(table).select('user_id');
+        expect(error, `${table} errored`).toBeNull();
+        expect((data ?? []).filter((r: { user_id: string }) => r.user_id !== bob.id), `${table} leaked`).toHaveLength(0);
+      }
+    });
+
+    it('refuses a movement on another user’s item', async () => {
+      const { error } = await bob.client
+        .from('pantry_movements')
+        .insert({ user_id: bob.id, item_id: aliceEggsId, kind: 'bought', quantity: 1 });
+      expect(error?.code).toBe('42501');
+    });
+
+    it('refuses a purchase linked to another user’s spend', async () => {
+      const { error } = await alice.client
+        .from('pantry_movements')
+        .insert({ user_id: alice.id, item_id: aliceEggsId, kind: 'bought', quantity: 1, spend_id: bobSpendId });
+      expect(error?.code).toBe('42501');
+    });
+
+    it('refuses to take another user’s food log from stock', async () => {
+      const { error } = await alice.client
+        .from('pantry_movements')
+        .insert({ user_id: alice.id, item_id: aliceEggsId, kind: 'used', quantity: -2, food_log_id: bobLogId });
+      expect(error?.code).toBe('42501');
+    });
+
+    it('refuses the wrong sign for what happened', async () => {
+      const { error } = await alice.client
+        .from('pantry_movements')
+        .insert({ user_id: alice.id, item_id: aliceEggsId, kind: 'used', quantity: 5 });
+      expect(error?.code).toBe('23514');
+    });
+
+    it('takes a food log from stock once, and gives it back when the log is edited', async () => {
+      const take = () =>
+        alice.client
+          .from('pantry_movements')
+          .insert({ user_id: alice.id, item_id: aliceEggsId, kind: 'used', quantity: -2, food_log_id: aliceLogId });
+
+      expect((await take()).error).toBeNull();
+      expect((await take()).error?.code).toBe('23505');
+
+      const { error: editError } = await alice.client.from('food_logs').update({ quantity: 3, grams: 150 }).eq('id', aliceLogId);
+      expect(editError).toBeNull();
+
+      const { data: after } = await alice.client.from('pantry_movements').select('id').eq('food_log_id', aliceLogId);
+      expect(after ?? []).toHaveLength(0);
+    });
+
+    it('allows only one live item per food', async () => {
+      const { error } = await alice.client
+        .from('pantry_items')
+        .insert({ user_id: alice.id, label: 'more eggs', food_id: eggFoodId, unit: 'piece' });
+      expect(error?.code).toBe('23505');
+    });
+
+    it('still deletes an account with a stocked kitchen', async () => {
+      const doomed = await createTestUser('doomed-kitchen');
+      const [{ data: item }, { data: spend }, { data: log }] = await Promise.all([
+        doomed.client
+          .from('pantry_items')
+          .insert({ user_id: doomed.id, label: 'eggs', food_id: eggFoodId, unit: 'piece' })
+          .select('id')
+          .single(),
+        doomed.client.from('spends').insert({ user_id: doomed.id, amount_paise: 8_400, category: 'groceries' }).select('id').single(),
+        doomed.client
+          .from('food_logs')
+          .insert({ user_id: doomed.id, food_id: eggFoodId, description: 'eggs', quantity: 1, unit_label: 'piece', grams: 50, kcal: 78 })
+          .select('id')
+          .single(),
+      ]);
+      // A purchase linked to a spend: deleting the account sets spend_id to
+      // null, which fires the movement guard mid-deletion.
+      const movements = await Promise.all([
+        doomed.client.from('pantry_movements').insert({ user_id: doomed.id, item_id: item!.id, kind: 'bought', quantity: 12, spend_id: spend!.id }),
+        doomed.client.from('pantry_movements').insert({ user_id: doomed.id, item_id: item!.id, kind: 'used', quantity: -1, food_log_id: log!.id }),
+      ]);
+      for (const m of movements) expect(m.error).toBeNull();
+
+      const { error } = await adminClient().auth.admin.deleteUser(doomed.id);
+      expect(error, 'account deletion failed').toBeNull();
+
+      const admin = adminClient();
+      for (const table of ['pantry_items', 'pantry_movements', 'spends', 'food_logs']) {
+        const { data } = await admin.from(table).select('user_id').eq('user_id', doomed.id);
+        expect(data ?? [], `${table} kept rows for a deleted user`).toHaveLength(0);
+      }
+    }, 60_000);
+  });
+
   // --- reference data -----------------------------------------------------
 
   describe('shared reference data', () => {
