@@ -1,4 +1,5 @@
-import { Barcode, Mic } from 'lucide-react';
+import Link from 'next/link';
+import { Barcode, Mic, Refrigerator } from 'lucide-react';
 import { Panel, PageHeader, Rail, Ring, Section, Unavailable } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { ScalePhotoLogger } from '@/components/scale-photo';
@@ -29,7 +30,19 @@ export default async function FoodPage() {
     <>
       <SampleBanner isSample={day.isSample} />
 
-      <PageHeader title="Food" lede={day.remaining.message} />
+      <PageHeader
+        title="Food"
+        lede={day.remaining.message}
+        action={
+          <Link
+            href="/food/kitchen"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium"
+            style={{ color: 'var(--primary-dark)' }}
+          >
+            <Refrigerator size={16} aria-hidden /> Kitchen stock
+          </Link>
+        }
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
         {/* ---------------- Adding food ---------------- */}
