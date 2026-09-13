@@ -4,10 +4,14 @@ An honest account of what exists, what is partial, and what has not been built.
 The brief's rule 98 applies to this document as much as to the UI: nothing is
 described as working that has not been run.
 
-Verified by `npm test` (275 passing), `npm run test:rls` (19 passing against a
-live project), `npm run build` (clean), `eslint` (clean),
-and — as of this revision — **against a live Supabase project and a production
-Vercel deployment**, not only in sample mode.
+Verified by `npm test` (515 passing), `npm run build` (clean), `eslint` and
+`tsc` (clean), and against a live Supabase project, not only in sample mode.
+
+As of 2026-09-14, `npm run test:rls` runs 60 tests: **36 pass; 5 fail and 19
+are skipped, all because migrations `20260903120016`–`18` are committed but not
+yet applied** (see "Suggested next order of work", item 0). Every failure is a
+table that does not exist yet; every test against existing tables passes. The
+counts below this paragraph are from earlier revisions.
 
 Live verification performed:
 
@@ -134,6 +138,8 @@ Live verification performed:
 | Savings goals | **Done** — `savings_goals` holds the plan (target, optional date, anything saved before starting). Adding money writes an ordinary spend filed as savings with `savings_goal_id`, so there is still one ledger, and it cannot be recategorised or linked to another user's goal. Shows what each month needs to meet the date and — only once there are two full calendar months of history — the actual pace, a likely finish month and the monthly gap. A goal can be edited (name, target, date, amount saved before), and each has a history of money in and out where a mistake can be removed |
 | Taking money back out of a goal | **Built, not yet live** — `savings_withdrawals` (migration `20260903120016`), because a withdrawal is neither spending nor income. A goal holds opening + contributions − withdrawals, and the pace is what stayed in. "Where your income went" places withdrawals beside income, so spending funded from savings balances without moving the salary trend or savings rate. The database refuses a withdrawal from another user's goal or for more than the goal holds, locking the goal while it checks. **The migration has not been pushed**: until it is, taking money out fails with "We could not record that" and everything else works. The isolation tests for it (`npm run test:rls`) were confirmed failing before the migration, as they should, and have not yet been run after it |
 | Savings and the monthly amount | **Decided 2026-09-13** — money filed as savings does **not** count as spending against the monthly amount. The ring is "Spent" and the amount is "what you plan to spend", so a deposit reading as "₹2,500 spent" contradicted both. Set-aside money is shown beside the spending instead. A savings commitment (a SIP) stays in what is owed but not in what is free, or paying it would hand the money back. The rule lives in one function, `countsAsSpending` in `src/lib/engines/money.ts` |
+| Trends over time | **Done, live-verified** — `/money/trends`. This month against the *same point* of last month; what moved between the last two full months and which categories moved it; a usual month; savings rate; whether money with no recorded destination is shrinking; whether wants take a larger share; fixed costs against usual income; subscriptions at their yearly cost. Only full, fully-recorded months are compared — the current month and a month recording began partway through are shown and never compared. Month-by-month stacked columns in the same colours as "where your income went", with a readout on hover, focus or tap and a table view; series palette run through the colour validator in both themes. Reads existing tables only, paged past PostgREST's 1,000-row limit. Verified end to end with a throwaway account: 13/13 (`scripts/e2e/trends.mjs`), light, dark and phone |
+| Statement import (CSV) | **Built, not yet live** — `/money/import`, migration `20260903120018`. The agreed pipeline, unshortened: the file is read on the device; the header is found beneath a bank's preamble; dates, amounts and direction are normalised (HDFC-, SBI- and ICICI-style exports, Dr/Cr columns, signed single amounts); every line is stored as read, unreadable ones with a reason; duplicates are found within the file and against spends already recorded a day either side; merchants are recognised from UPI/POS/NEFT/ATM narrations; categories are suggested from rules the person taught it, then a short list of unambiguous merchants — Amazon, cash and payments to a person get no guess, and no model classifies anything. Nothing is recorded until the person confirms, and confirmed lines go through `insertSpends`, the same insert "Add a spend" uses. Corrections are remembered per merchant. **Not built:** a transfer to savings becoming a goal contribution, a grocery shop adding kitchen stock. Until the migration is pushed the page says import is not set up |
 
 Two rules the food estimate is built on, both worth keeping:
 
@@ -148,12 +154,21 @@ Two rules the food estimate is built on, both worth keeping:
   in the direction that tells someone to spend more. Below two thirds
   coverage the comparison is withheld and the reason given.
 
+## Kitchen
+
+| Item | Status |
+| --- | --- |
+| Kitchen stock | **Built, not yet live** — `/food/kitchen`, migration `20260903120017`. `pantry_items` is what is kept and `pantry_movements` is what happened to it (bought, used, thrown out, counted); on hand is their sum, and a count stores the difference it made. The unused `grocery_items` list tables were left alone: a shopping list is not a running balance. Buying can record its cost as a groceries spend, taken back out if the stock write fails. "About N days left" needs three uses across at least a week in the last four weeks; what was thrown out is not use. A short to-buy list shows only what can honestly be called low |
+| Food log → stock | **Built, not yet live** — only foods logged *as themselves* (eggs, milk, curd) are offered, and only when the person confirms they came from home: `food_logs` does not record where a meal was eaten, and food eaten out must never empty the kitchen. A log is taken from stock once, only against the item for that same food; editing or removing the log releases it. **Not built:** mixed dishes depleting ingredients, which needs `recipe_id` on logs and seeded recipes |
+
 ## Phase 6–8 — Adherence, advanced, production
 
 Schema exists for habits, reviews, notifications, feedback, grocery lists,
 budgets and evidence claims. The **engines** for adherence, recovery and reviews
 are built and tested. The **UI and scheduling** for notifications, weekly
-reviews, grocery generation, travel mode and restaurant mode are **not built**.
+reviews, grocery-list generation, travel mode and restaurant mode are **not
+built**. Kitchen stock, which the grocery tables were once expected to carry,
+is its own ledger — see Kitchen above.
 
 ---
 
@@ -200,6 +215,17 @@ avoid. Treat the `displayReadable` discipline as unproven until measured.
 
 ## Suggested next order of work
 
+0. **Push the three waiting migrations, then verify.** `20260903120016`
+   (savings withdrawals), `20260903120017` (kitchen stock) and
+   `20260903120018` (statement import) are committed and not applied: pushing
+   to the live project was held for the owner's approval. Code for all three
+   degrades plainly without them. After `npx supabase db push`, run
+   `npm run test:rls` — the tests for these tables are written and were
+   confirmed failing before the migrations — and the end-to-end scripts,
+   which switch from checking the "not set up" state to the full flows:
+   `node --env-file=.env.local scripts/e2e/savings.mjs <url>`, then
+   `kitchen.mjs` and `import.mjs`. None of these three migrations has been
+   executed against Postgres yet, so read the first push's output.
 1. **Curate the video library.** `videos` is empty and `review_status` defaults
    to `pending`, so `video-recommendation.ts` has nothing approved to return.
    The engine, the metadata and the review gate are all built; only the content

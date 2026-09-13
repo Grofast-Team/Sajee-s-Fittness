@@ -1,8 +1,28 @@
 # Money roadmap: from recording to understanding
 
 **Status:** Sequencing agreed 2026-09-13. Feature 1 shipped the same day
-(`8697fd8`); Feature 2 has a full implementation plan. Each later feature gets
-its own when its predecessor ships.
+(`8697fd8`); Feature 2 shipped the same evening (`9b39202`) and was completed
+on 2026-09-14 with withdrawals and goal edits. Features 3, 4 and 5 were built
+on 2026-09-14, in the order 5, 3, 4: pushing migrations to the live project
+was held for the owner's approval, and Feature 5 was the only one that needed
+none, so it was the only one that could be verified end to end that day.
+Features 2 (withdrawals), 3 and 4 await migrations `20260903120016`–`18`; see
+`docs/STATUS.md`. Feature 6 has not been started.
+
+The decisions each build made where this document left a choice open:
+
+- **Savings and the monthly amount:** savings do not count as spending
+  (`countsAsSpending`). A savings commitment stays owed but is not taken off
+  what is free.
+- **Feature 3:** purpose-built `pantry_items` / `pantry_movements` beside the
+  untouched `grocery_items`. A log depletes stock only when the person
+  confirms it came from home, because `food_logs` records no location.
+- **Feature 4:** staging tables `import_batches` / `import_rows` and learned
+  `merchant_rules`; confirmation writes through `insertSpends`, shared with
+  "Add a spend". Transfers to savings goals and grocery shops adding stock are
+  not yet linked.
+- **Feature 5:** reads existing tables only; compares full, fully-recorded
+  months, and the current month only against the same point of the last.
 
 **Read first:** `docs/ARCHITECTURE.md` §8 records what was deliberately *not*
 adopted from the "Life OS" proposal (Prisma, a duplicated `events` table, a
