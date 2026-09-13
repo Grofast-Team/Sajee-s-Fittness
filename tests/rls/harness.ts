@@ -188,4 +188,5 @@ export const OWNER_TABLES = [
   'step_segments',
   'step_validations',
   'savings_goals',
+  'savings_withdrawals',
 ] as const;

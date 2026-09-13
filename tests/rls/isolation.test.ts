@@ -240,6 +240,7 @@ suite('Row Level Security', () => {
       'step_segments',
       'step_validations',
       'savings_goals',
+      'savings_withdrawals',
     ] as const;
 
     let aliceSpendId: string;
@@ -293,6 +294,19 @@ suite('Row Level Security', () => {
           .insert({ user_id: alice.id, label: 'alice deposit', target_paise: 50_000_000 }),
       ]);
       for (const seed of seeds) expect(seed.error).toBeNull();
+
+      // A withdrawal needs a goal holding something, so it cannot join the
+      // parallel seeds above.
+      const { data: held, error: heldError } = await alice.client
+        .from('savings_goals')
+        .insert({ user_id: alice.id, label: 'alice rainy day', target_paise: 1_000_000, opening_paise: 500_000 })
+        .select('id')
+        .single();
+      expect(heldError).toBeNull();
+      const { error: withdrawalError } = await alice.client
+        .from('savings_withdrawals')
+        .insert({ user_id: alice.id, savings_goal_id: held!.id, amount_paise: 100_000, note: 'alice private reason' });
+      expect(withdrawalError).toBeNull();
     }, 60_000);
 
     it('has something of Alice’s in every money table, so the checks below mean something', async () => {
@@ -726,6 +740,86 @@ suite('Row Level Security', () => {
       expect(revisions![0].changed_fields).toEqual(['savings_goal_id']);
     });
 
+    // Taking money out has its own ledger and its own guard, and both have to
+    // hold without the application in the way.
+    it('refuses to take money out of another user’s goal', async () => {
+      const { error } = await bob.client.from('savings_withdrawals').insert({
+        user_id: bob.id,
+        savings_goal_id: aliceGoalId,
+        amount_paise: 1,
+      });
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    });
+
+    it('refuses to take out more than a goal holds, counting what went in and came out', async () => {
+      const { data: goal } = await alice.client
+        .from('savings_goals')
+        .insert({ user_id: alice.id, label: 'alice holds 7000', target_paise: 1_000_000, opening_paise: 5_000 })
+        .select('id')
+        .single();
+      const { error: contributionError } = await alice.client.from('spends').insert({
+        user_id: alice.id,
+        amount_paise: 2_000,
+        category: 'savings',
+        savings_goal_id: goal!.id,
+      });
+      expect(contributionError).toBeNull();
+
+      const attempt = (amount: number) =>
+        alice.client
+          .from('savings_withdrawals')
+          .insert({ user_id: alice.id, savings_goal_id: goal!.id, amount_paise: amount });
+
+      const tooMuch = await attempt(7_001);
+      expect(tooMuch.error?.code).toBe('23514');
+
+      expect((await attempt(4_000)).error).toBeNull();
+
+      // ₹30 is left; the first withdrawal counts against the second.
+      const nowTooMuch = await attempt(3_001);
+      expect(nowTooMuch.error?.code).toBe('23514');
+
+      expect((await attempt(3_000)).error).toBeNull();
+    });
+
+    it('does not let a withdrawal be edited, or removed by someone else', async () => {
+      const { data: goal } = await alice.client
+        .from('savings_goals')
+        .insert({ user_id: alice.id, label: 'alice fixed', target_paise: 1_000_000, opening_paise: 10_000 })
+        .select('id')
+        .single();
+      const { data: withdrawal } = await alice.client
+        .from('savings_withdrawals')
+        .insert({ user_id: alice.id, savings_goal_id: goal!.id, amount_paise: 1_000 })
+        .select('id')
+        .single();
+
+      // No update policy: correcting one means removing it and recording it
+      // again, so the balance guard is the only way in.
+      const { data: edited } = await alice.client
+        .from('savings_withdrawals')
+        .update({ amount_paise: 999_999 })
+        .eq('id', withdrawal!.id)
+        .select('id');
+      expect(edited ?? []).toHaveLength(0);
+
+      const { data: removedByBob } = await bob.client
+        .from('savings_withdrawals')
+        .delete()
+        .eq('id', withdrawal!.id)
+        .select('id');
+      expect(removedByBob ?? []).toHaveLength(0);
+
+      const { data: removed, error } = await alice.client
+        .from('savings_withdrawals')
+        .delete()
+        .eq('id', withdrawal!.id)
+        .select('id');
+      expect(error).toBeNull();
+      expect(removed).toHaveLength(1);
+    });
+
     // Deleting a user cascades to goals (setting spends.savings_goal_id to
     // null, which fires the revision trigger) and to spends. The trap from
     // 20260829100014 in a new shape.
@@ -742,12 +836,18 @@ suite('Row Level Security', () => {
         category: 'savings',
         savings_goal_id: goal!.id,
       });
+      // Setting savings_withdrawals.savings_goal_id to null fires the guard
+      // mid-deletion; it has to let that through.
+      const { error: withdrawalError } = await doomed.client
+        .from('savings_withdrawals')
+        .insert({ user_id: doomed.id, savings_goal_id: goal!.id, amount_paise: 500 });
+      expect(withdrawalError).toBeNull();
 
       const { error } = await adminClient().auth.admin.deleteUser(doomed.id);
       expect(error, 'account deletion failed').toBeNull();
 
       const admin = adminClient();
-      for (const table of ['savings_goals', 'spends', 'spend_revisions']) {
+      for (const table of ['savings_goals', 'spends', 'spend_revisions', 'savings_withdrawals']) {
         const { data } = await admin.from(table).select('user_id').eq('user_id', doomed.id);
         expect(data ?? [], `${table} kept rows for a deleted user`).toHaveLength(0);
       }

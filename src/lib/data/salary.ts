@@ -36,7 +36,7 @@ export async function getSalaryView(windowStart: string, windowEnd: string): Pro
   // A year of income for the trend, independent of the current window.
   const yearAgo = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
 
-  const [incomeRes, historyRes, spendsRes, sourcesRes] = await Promise.all([
+  const [incomeRes, historyRes, spendsRes, sourcesRes, withdrawalsRes] = await Promise.all([
     supabase
       .from('incomes')
       .select('amount_paise')
@@ -60,6 +60,14 @@ export async function getSalaryView(windowStart: string, windowEnd: string): Pro
       .eq('user_id', userId)
       .is('ended_on', null)
       .order('created_at', { ascending: true }),
+    // Money back out of savings arrived to be spent, so it balances against
+    // outgoings — but it is not income, and stays out of the trend above.
+    supabase
+      .from('savings_withdrawals')
+      .select('amount_paise')
+      .eq('user_id', userId)
+      .gte('withdrawn_on', windowStart)
+      .lt('withdrawn_on', windowEnd),
   ]);
 
   const incomes = incomeRes.data ?? [];
@@ -67,6 +75,7 @@ export async function getSalaryView(windowStart: string, windowEnd: string): Pro
 
   const breakdown = whereDidItGo({
     incomePaise: incomes.reduce((s, i) => s + Number(i.amount_paise), 0),
+    withdrawnPaise: (withdrawalsRes.data ?? []).reduce((s, w) => s + Number(w.amount_paise), 0),
     incomeCount: incomes.length,
     spends: spends.map((s) => ({
       amountPaise: Number(s.amount_paise),

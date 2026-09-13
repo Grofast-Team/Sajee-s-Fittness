@@ -61,6 +61,12 @@ export interface SalaryInput {
   spends: SpendForSalary[];
   /** How many separate payments made up the income. */
   incomeCount: number;
+  /**
+   * Money taken back out of savings goals in the window. Not income — it does
+   * not change the savings rate or the salary trend — but it did arrive in the
+   * account, so it sits beside income when working out what is not accounted for.
+   */
+  withdrawnPaise?: number;
 }
 
 export interface BreakdownLine {
@@ -73,12 +79,16 @@ export interface BreakdownLine {
 
 export interface SalaryBreakdown {
   incomePaise: number;
+  /** Taken back out of savings in the window. */
+  withdrawnPaise: number;
+  /** Income plus withdrawals: everything that arrived to be spent. */
+  availablePaise: number;
   /** Money that left, excluding savings. */
   spentPaise: number;
   savedPaise: number;
   /**
-   * Income minus everything recorded. Not "remaining": see the module comment.
-   * Negative when recorded outgoings exceed what arrived.
+   * Income and withdrawals, minus everything recorded. Not "remaining": see the
+   * module comment. Negative when recorded outgoings exceed what arrived.
    */
   unaccountedPaise: number;
 
@@ -109,6 +119,8 @@ const pct = (share: number) => `${Math.round(share * 100)}%`;
 
 export function whereDidItGo(input: SalaryInput): SalaryBreakdown {
   const income = input.incomePaise;
+  const withdrawnPaise = input.withdrawnPaise ?? 0;
+  const availablePaise = income + withdrawnPaise;
   const hasIncome = income > 0;
   const share = (paise: number) => (hasIncome ? paise / income : null);
 
@@ -126,7 +138,7 @@ export function whereDidItGo(input: SalaryInput): SalaryBreakdown {
   const savedPaise = byIntent.savings;
   const totalOut = input.spends.reduce((s, x) => s + x.amountPaise, 0);
   const spentPaise = totalOut - savedPaise;
-  const unaccountedPaise = income - totalOut;
+  const unaccountedPaise = availablePaise - totalOut;
 
   const byCategory: BreakdownLine[] = [...byCategoryMap.entries()]
     .map(([key, paise]) => ({ key, label: categoryLabel(key), paise, share: share(paise) }))
@@ -155,6 +167,13 @@ export function whereDidItGo(input: SalaryInput): SalaryBreakdown {
     observations.push(`You set aside ${rupees(savedPaise)} — ${pct(savedPaise / income)} of your income.`);
   }
 
+  if (withdrawnPaise > 0) {
+    observations.push(
+      `You took ${rupees(withdrawnPaise)} back out of savings. It is counted as money that arrived, ` +
+        `not as income.`,
+    );
+  }
+
   // The largest single category is the most useful one-line answer to the
   // question as people actually ask it.
   const biggest = byCategory.find((line) => line.key !== 'savings');
@@ -164,6 +183,8 @@ export function whereDidItGo(input: SalaryInput): SalaryBreakdown {
 
   return {
     incomePaise: income,
+    withdrawnPaise,
+    availablePaise,
     spentPaise,
     savedPaise,
     unaccountedPaise,
@@ -172,7 +193,15 @@ export function whereDidItGo(input: SalaryInput): SalaryBreakdown {
     savingsRate: share(savedPaise),
     obligationShare: share(byIntent.obligation),
     wantsShareFloor: share(byIntent.want),
-    headline: headlineFor({ income, spentPaise, savedPaise, unaccountedPaise, hasIncome, spendCount: input.spends.length }),
+    headline: headlineFor({
+      income,
+      withdrawnPaise,
+      spentPaise,
+      savedPaise,
+      unaccountedPaise,
+      hasIncome,
+      spendCount: input.spends.length,
+    }),
     observations,
     hasIncome,
   };
@@ -180,6 +209,7 @@ export function whereDidItGo(input: SalaryInput): SalaryBreakdown {
 
 function headlineFor(input: {
   income: number;
+  withdrawnPaise: number;
   spentPaise: number;
   savedPaise: number;
   unaccountedPaise: number;
@@ -192,12 +222,18 @@ function headlineFor(input: {
       : 'Record what came in this month and we can show what share of it each thing took.';
   }
 
+  const available = input.income + input.withdrawnPaise;
+  const arrived =
+    input.withdrawnPaise > 0
+      ? `${rupees(input.income)} came in and ${rupees(input.withdrawnPaise)} was taken from savings`
+      : `${rupees(input.income)} came in`;
+
   if (input.unaccountedPaise < 0) {
     // Spending more than arrived is common and usually has an innocent
     // explanation — last month's money, savings drawn down, a bonus not yet
     // recorded. Say the arithmetic and stop.
     return (
-      `${rupees(input.income)} came in and ${rupees(input.income - input.unaccountedPaise)} is recorded ` +
+      `${arrived}, and ${rupees(available - input.unaccountedPaise)} is recorded ` +
       `going out — ${rupees(Math.abs(input.unaccountedPaise))} more than arrived this month.`
     );
   }
@@ -205,8 +241,13 @@ function headlineFor(input: {
   const parts = [`${rupees(input.spentPaise)} spent`];
   if (input.savedPaise > 0) parts.push(`${rupees(input.savedPaise)} saved`);
 
+  const of =
+    input.withdrawnPaise > 0
+      ? `Of ${rupees(input.income)} income and ${rupees(input.withdrawnPaise)} taken from savings`
+      : `Of ${rupees(input.income)}`;
+
   return (
-    `Of ${rupees(input.income)}: ${parts.join(', ')}, and ${rupees(input.unaccountedPaise)} not ` +
+    `${of}: ${parts.join(', ')}, and ${rupees(input.unaccountedPaise)} not ` +
     `accounted for — either still with you, or spent and not recorded here.`
   );
 }

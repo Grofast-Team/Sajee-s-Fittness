@@ -11,6 +11,11 @@ import { formatRupees } from '@/lib/engines/money';
  * file never sees a stored balance, so a goal's total cannot drift away from
  * the records it is built from.
  *
+ * Taking money back out is the one thing that is not a spend: it is a row in
+ * `savings_withdrawals`, because money leaving savings is neither spending nor
+ * income. What a goal holds is the opening balance, plus what went in, minus
+ * what came out.
+ *
  * ## What it refuses to guess
  *
  * A pace needs history. One deposit in the week a goal was created is not a
@@ -48,8 +53,18 @@ export interface Contribution {
   spentOn: string;
 }
 
+export interface Withdrawal {
+  amountPaise: number;
+  /** YYYY-MM-DD. */
+  withdrawnOn: string;
+}
+
 export interface GoalProgress {
   goal: SavingsGoal;
+  /** Every contribution ever made, excluding the opening balance. */
+  contributedPaise: number;
+  withdrawnPaise: number;
+  /** Opening + contributed − withdrawn, never below zero. What can be taken out. */
   savedPaise: number;
   remainingPaise: number;
   /** 0-1, capped at 1. */
@@ -59,7 +74,11 @@ export interface GoalProgress {
   pastDate: boolean;
   /** What each month from next month to the target month needs. Null without a future date, or once reached. */
   requiredMonthlyPaise: number | null;
-  /** Average over full months. Null until there are MIN_FULL_MONTHS of them. */
+  /**
+   * What stayed in, averaged over full months: contributions minus withdrawals.
+   * Negative when more came out than went in. Null until there are
+   * MIN_FULL_MONTHS of them.
+   */
   averageMonthlyPaise: number | null;
   /** How many full calendar months the goal has existed for. */
   fullMonths: number;
@@ -99,9 +118,13 @@ export function goalProgress(
   goal: SavingsGoal,
   contributions: Contribution[],
   today: string,
+  withdrawals: Withdrawal[] = [],
 ): GoalProgress {
-  const contributed = contributions.reduce((sum, c) => sum + c.amountPaise, 0);
-  const savedPaise = goal.openingPaise + contributed;
+  const contributedPaise = contributions.reduce((sum, c) => sum + c.amountPaise, 0);
+  const withdrawnPaise = withdrawals.reduce((sum, w) => sum + w.amountPaise, 0);
+  // Can only go negative if a contribution was removed after money was taken
+  // out against it. The records say less than nothing; the goal holds nothing.
+  const savedPaise = Math.max(0, goal.openingPaise + contributedPaise - withdrawnPaise);
   const remainingPaise = Math.max(0, goal.targetPaise - savedPaise);
   const reached = savedPaise >= goal.targetPaise;
   const share = Math.min(1, savedPaise / goal.targetPaise);
@@ -112,15 +135,20 @@ export function goalProgress(
   const firstFull = monthIndex(goal.startedOn) + (goal.startedOn.endsWith('-01') ? 0 : 1);
   const fullMonths = Math.max(0, current - firstFull);
 
+  const inFullMonth = (date: string) => {
+    const month = monthIndex(date);
+    return month >= firstFull && month < current;
+  };
+
   let averageMonthlyPaise: number | null = null;
   if (fullMonths >= MIN_FULL_MONTHS) {
-    const inFullMonths = contributions
-      .filter((c) => {
-        const month = monthIndex(c.spentOn);
-        return month >= firstFull && month < current;
-      })
+    const wentIn = contributions
+      .filter((c) => inFullMonth(c.spentOn))
       .reduce((sum, c) => sum + c.amountPaise, 0);
-    averageMonthlyPaise = Math.round(inFullMonths / fullMonths);
+    const cameOut = withdrawals
+      .filter((w) => inFullMonth(w.withdrawnOn))
+      .reduce((sum, w) => sum + w.amountPaise, 0);
+    averageMonthlyPaise = Math.round((wentIn - cameOut) / fullMonths);
   }
 
   const pastDate = !reached && goal.targetDate !== null && goal.targetDate < today;
@@ -148,6 +176,8 @@ export function goalProgress(
 
   const progress = {
     goal,
+    contributedPaise,
+    withdrawnPaise,
     savedPaise,
     remainingPaise,
     share,
@@ -190,7 +220,10 @@ function messageFor(p: Omit<GoalProgress, 'message'>): string {
   }
 
   if (p.averageMonthlyPaise === 0 || p.projectedMonth === null) {
-    const nothing = `Nothing has been added in the ${p.fullMonths} full months since this goal began.`;
+    const nothing =
+      p.averageMonthlyPaise < 0
+        ? `More has come out than gone in over the ${p.fullMonths} full months since this goal began.`
+        : `Nothing has been added in the ${p.fullMonths} full months since this goal began.`;
     if (p.pastDate) return `${passed} ${nothing}`;
     if (p.requiredMonthlyPaise !== null) {
       return `${nothing} About ${formatRupees(p.requiredMonthlyPaise)} a month would get there by ${byDate}.`;

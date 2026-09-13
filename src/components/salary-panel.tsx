@@ -92,11 +92,14 @@ export function SalaryPanel({ view, canEdit }: { view: SalaryView; canEdit: bool
     },
   ].filter((s) => s.paise > 0);
 
-  const outgoings = b.incomePaise - b.unaccountedPaise;
+  // Everything that arrived to be spent: income, plus anything taken back out
+  // of savings. Shares are of this, so they still add up to the whole bar.
+  const arrived = b.availablePaise;
+  const outgoings = arrived - b.unaccountedPaise;
   // When more went out than came in, the bar is scaled to what went out and a
   // tick marks where income ran out — the overspend is shown, not clipped.
-  const scale = Math.max(b.incomePaise, outgoings, 1);
-  const incomeTickAt = b.unaccountedPaise < 0 ? (b.incomePaise / scale) * 100 : null;
+  const scale = Math.max(arrived, outgoings, 1);
+  const incomeTickAt = b.unaccountedPaise < 0 ? (arrived / scale) * 100 : null;
 
   const active = segments.find((s) => s.key === hovered) ?? null;
 
@@ -110,6 +113,12 @@ export function SalaryPanel({ view, canEdit }: { view: SalaryView; canEdit: bool
             </span>
             <span className="text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
               came in this month
+              {b.withdrawnPaise > 0 ? (
+                <>
+                  , plus <span className="data">{formatRupees(b.withdrawnPaise)}</span> taken from
+                  savings
+                </>
+              ) : null}
             </span>
           </div>
 
@@ -171,12 +180,16 @@ export function SalaryPanel({ view, canEdit }: { view: SalaryView; canEdit: bool
                 <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{active.label}</span>{' '}
                 <span className="data">
                   {formatRupees(active.paise)}
-                  {b.incomePaise > 0 ? ` · ${Math.round((active.paise / b.incomePaise) * 100)}%` : ''}
+                  {arrived > 0 ? ` · ${Math.round((active.paise / arrived) * 100)}%` : ''}
                 </span>{' '}
                 — {active.description}
               </>
             ) : incomeTickAt !== null ? (
-              'The mark shows where this month’s income ran out.'
+              b.withdrawnPaise > 0 ? (
+                'The mark shows where this month’s income and the money taken from savings ran out.'
+              ) : (
+                'The mark shows where this month’s income ran out.'
+              )
             ) : (
               'Tap a section for details.'
             )}
@@ -213,7 +226,7 @@ export function SalaryPanel({ view, canEdit }: { view: SalaryView; canEdit: bool
                     className="data w-14 py-1.5 text-right text-[13px]"
                     style={{ color: 'var(--fg-subtle)' }}
                   >
-                    {Math.round((s.paise / b.incomePaise) * 100)}%
+                    {Math.round((s.paise / arrived) * 100)}%
                   </td>
                 </tr>
               ))}
@@ -339,26 +352,30 @@ function IncomeForm({
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState(sources[0]?.label ?? 'Salary');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A transition, so the form closes in the same commit as the refreshed
+  // breakdown rather than a moment before it (see SavingsPanel's GoalRow).
+  const [saving, startTransition] = useTransition();
 
-  async function submit() {
-    setSaving(true);
+  function submit() {
     setError(null);
     const existing = sources.find((s) => s.label.toLowerCase() === label.trim().toLowerCase());
-    const result = await recordIncome({
-      amount,
-      receivedOn: date,
-      ...(existing ? { sourceId: existing.id } : { sourceLabel: label.trim() }),
-      kind: /salary/i.test(label) ? 'salary' : 'other',
+    startTransition(async () => {
+      const result = await recordIncome({
+        amount,
+        receivedOn: date,
+        ...(existing ? { sourceId: existing.id } : { sourceLabel: label.trim() }),
+        kind: /salary/i.test(label) ? 'salary' : 'other',
+      });
+      startTransition(() => {
+        if (result.ok) {
+          setAmount('');
+          onDone();
+        } else {
+          setError(result.error);
+        }
+      });
     });
-    setSaving(false);
-    if (result.ok) {
-      setAmount('');
-      onDone();
-    } else {
-      setError(result.error);
-    }
   }
 
   return (

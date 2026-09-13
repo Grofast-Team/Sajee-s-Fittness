@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { goalProgress, type Contribution, type SavingsGoal } from '@/lib/engines/savings';
+import { goalProgress, type Contribution, type SavingsGoal, type Withdrawal } from '@/lib/engines/savings';
 
 const TODAY = '2026-09-13';
 
@@ -174,5 +174,54 @@ describe('goalProgress', () => {
     for (const p of scenarios) {
       expect(p.message).not.toMatch(/should|must|behind|fail|lazy|careful|only/i);
     }
+  });
+});
+
+const out = (withdrawnOn: string, rupees: number): Withdrawal => ({ withdrawnOn, amountPaise: rupees * 100 });
+
+describe('taking money back out', () => {
+  it('takes withdrawals off what has been saved', () => {
+    const p = goalProgress(goal({ openingPaise: 2_000_000 }), [add('2026-07-05', 10_000)], TODAY, [
+      out('2026-09-01', 4_000),
+    ]);
+    expect(p.contributedPaise).toBe(1_000_000);
+    expect(p.withdrawnPaise).toBe(400_000);
+    expect(p.savedPaise).toBe(2_600_000);
+    expect(p.remainingPaise).toBe(7_400_000);
+  });
+
+  it('works the pace out from what stayed in, not what went in', () => {
+    // June to August: ₹60,000 in, ₹15,000 out → ₹15,000 a month.
+    const p = goalProgress(
+      goal(),
+      [add('2026-06-10', 20_000), add('2026-07-10', 20_000), add('2026-08-10', 20_000)],
+      TODAY,
+      [out('2026-08-20', 15_000)],
+    );
+    expect(p.fullMonths).toBe(3);
+    expect(p.averageMonthlyPaise).toBe(1_500_000);
+  });
+
+  it('does not project a finish when more came out than went in', () => {
+    const p = goalProgress(goal({ openingPaise: 5_000_000 }), [add('2026-07-10', 5_000)], TODAY, [
+      out('2026-08-10', 20_000),
+    ]);
+    expect(p.averageMonthlyPaise).toBeLessThan(0);
+    expect(p.projectedMonth).toBeNull();
+    expect(p.message).toMatch(/more has come out than gone in/i);
+    expect(p.message).not.toMatch(/should|must|behind|fail|lazy|careful|only/i);
+  });
+
+  it('never shows less than nothing saved', () => {
+    // A contribution removed after a withdrawal can leave the records negative.
+    const p = goalProgress(goal(), [], TODAY, [out('2026-09-01', 1_000)]);
+    expect(p.savedPaise).toBe(0);
+    expect(p.share).toBe(0);
+  });
+
+  it('un-reaches a goal that has been drawn down below its target', () => {
+    const p = goalProgress(goal({ openingPaise: 10_000_000 }), [], TODAY, [out('2026-09-02', 10_000)]);
+    expect(p.reached).toBe(false);
+    expect(p.remainingPaise).toBe(1_000_000);
   });
 });

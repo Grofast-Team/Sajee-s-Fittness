@@ -183,3 +183,43 @@ describe('salaryTrend', () => {
     expect(r.message).toBeNull();
   });
 });
+
+/*
+ * Money taken back out of a savings goal is not income — it must not move the
+ * salary trend or the savings rate — but it did arrive in the account, and
+ * spending funded by it has to balance against something.
+ */
+describe('money taken back out of savings', () => {
+  it('counts a withdrawal alongside income, not as income', () => {
+    const r = whereDidItGo({
+      incomePaise: 5_000_000,
+      withdrawnPaise: 1_000_000,
+      spends: [spend('rent', 10_000), spend('transport', 45_000)],
+      incomeCount: 1,
+    });
+    expect(r.incomePaise).toBe(5_000_000);
+    expect(r.withdrawnPaise).toBe(1_000_000);
+    expect(r.availablePaise).toBe(6_000_000);
+    // 50,000 + 10,000 − 55,000
+    expect(r.unaccountedPaise).toBe(500_000);
+    expect(r.headline).toMatch(/₹10,000 taken from savings/);
+  });
+
+  it('leaves the savings rate as a share of income', () => {
+    const r = whereDidItGo({
+      incomePaise: 5_000_000,
+      withdrawnPaise: 1_000_000,
+      spends: [spend('savings', 5_000)],
+      incomeCount: 1,
+    });
+    expect(r.savingsRate).toBeCloseTo(0.1, 5);
+    expect(r.observations.join(' ')).toMatch(/took ₹10,000 back out of savings/);
+  });
+
+  it('is unchanged when nothing was taken out', () => {
+    const r = whereDidItGo({ incomePaise: 5_000_000, spends: month, incomeCount: 1 });
+    expect(r.withdrawnPaise).toBe(0);
+    expect(r.availablePaise).toBe(5_000_000);
+    expect(r.headline).not.toMatch(/taken from savings/);
+  });
+});
