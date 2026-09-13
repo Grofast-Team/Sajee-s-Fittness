@@ -25,6 +25,8 @@ export interface SpendRow {
   /** Set when this spend settled a recurring commitment. Its category is locked. */
   commitmentId: string | null;
   intent: string | null;
+  /** Set when this spend was money added to a savings goal. Always savings. */
+  savingsGoalId: string | null;
 }
 
 export interface MoneyMonthView {
@@ -35,7 +37,7 @@ export interface MoneyMonthView {
   monthStartDay: number;
 }
 
-const SAMPLE_SPEND_ROWS: Omit<SpendRow, 'commitmentId' | 'intent'>[] = [
+const SAMPLE_SPEND_ROWS: Omit<SpendRow, 'commitmentId' | 'intent' | 'savingsGoalId'>[] = [
   { id: 's1', amountPaise: 1250000, category: 'rent', note: null, spentOn: '2026-09-01' },
   { id: 's2', amountPaise: 34000, category: 'groceries', note: 'Weekly vegetables', spentOn: '2026-09-03' },
   { id: 's3', amountPaise: 18000, category: 'eating_out', note: null, spentOn: '2026-09-04' },
@@ -48,6 +50,7 @@ const SAMPLE_SPENDS: SpendRow[] = SAMPLE_SPEND_ROWS.map((s) => ({
   ...s,
   commitmentId: null,
   intent: null,
+  savingsGoalId: null,
 }));
 
 export async function getMoneyMonth(): Promise<MoneyMonthView> {
@@ -70,7 +73,7 @@ export async function getMoneyMonth(): Promise<MoneyMonthView> {
 
   const { data: rows } = await supabase
     .from('spends')
-    .select('id, amount_paise, category, note, spent_on, commitment_id, intent')
+    .select('id, amount_paise, category, note, spent_on, commitment_id, intent, savings_goal_id')
     .eq('user_id', auth.user.id)
     .gte('spent_on', window.start)
     .lt('spent_on', window.end)
@@ -87,6 +90,7 @@ export async function getMoneyMonth(): Promise<MoneyMonthView> {
     spentOn: r.spent_on as string,
     commitmentId: (r.commitment_id as string) ?? null,
     intent: (r.intent as string) ?? null,
+    savingsGoalId: (r.savings_goal_id as string) ?? null,
   }));
 
   return {

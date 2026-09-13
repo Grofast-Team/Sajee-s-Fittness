@@ -107,7 +107,7 @@ export async function deleteSpend(id: string): Promise<MoneyResult> {
  * Correct a recorded spend.
  *
  * `z.strictObject` rejects any key it does not name, so a request carrying
- * `user_id` or `commitment_id` fails validation rather than being quietly
+ * `user_id`, `commitment_id` or `savings_goal_id` fails validation rather than being quietly
  * ignored — ownership and the bill a payment settled are never editable from
  * here. The database enforces both again underneath.
  */
@@ -139,7 +139,7 @@ export async function updateSpend(input: unknown): Promise<MoneyResult> {
 
   const { data: row } = await supabase
     .from('spends')
-    .select('id, amount_paise, category, note, spent_on, intent, commitment_id')
+    .select('id, amount_paise, category, note, spent_on, intent, commitment_id, savings_goal_id')
     .eq('id', id)
     .eq('user_id', userId)
     .maybeSingle();
@@ -154,6 +154,7 @@ export async function updateSpend(input: unknown): Promise<MoneyResult> {
     spentOn: row.spent_on as string,
     intent: (row.intent as SpendIntent) ?? null,
     commitmentId: (row.commitment_id as string) ?? null,
+    savingsGoalId: (row.savings_goal_id as string) ?? null,
   };
 
   const linked = existing.commitmentId

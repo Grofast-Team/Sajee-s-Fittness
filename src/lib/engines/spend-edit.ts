@@ -22,6 +22,8 @@ export interface ExistingSpend {
   spentOn: string;
   intent: SpendIntent | null;
   commitmentId: string | null;
+  /** Set when this spend was money added to a savings goal. Always savings. */
+  savingsGoalId: string | null;
 }
 
 export interface SpendChange {
@@ -64,6 +66,14 @@ export function planSpendEdit(
       return {
         ok: false,
         error: `This payment settled ${bill}, so it stays filed with it. To file it differently, remove it and record it again.`,
+      };
+    }
+
+    if (existing.savingsGoalId !== null) {
+      return {
+        ok: false,
+        error:
+          'This went into a savings goal, so it stays filed as savings. To file it differently, remove it and record it again.',
       };
     }
 

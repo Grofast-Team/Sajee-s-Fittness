@@ -141,7 +141,9 @@ export function SpendList({ spends, canEdit }: { spends: SpendRow[]; canEdit: bo
                       <span className="flex-1 text-sm">
                         {s.commitmentId
                           ? 'Remove this payment? The bill it settled may show as unpaid again.'
-                          : 'Remove this spend?'}
+                          : s.savingsGoalId
+                            ? 'Remove this? It comes off the savings goal it was added to.'
+                            : 'Remove this spend?'}
                       </span>
                       <Button variant="danger" size="sm" disabled={pending} onClick={() => remove(s.id)}>
                         {pending ? 'Removing…' : 'Remove'}
@@ -178,6 +180,8 @@ function EditForm({
   const [saving, setSaving] = useState(false);
 
   const settled = spend.commitmentId !== null;
+  const saved = spend.savingsGoalId !== null;
+  const locked = settled || saved;
 
   async function save() {
     const paise = parseAmountToPaise(amount);
@@ -192,9 +196,10 @@ function EditForm({
     const result = await updateSpend({
       id: spend.id,
       amountPaise: paise,
-      // A bill payment's category follows the bill, and the database refuses
-      // to change it — so it is not sent rather than sent and rejected.
-      ...(settled ? {} : { category }),
+      // A bill payment's category follows the bill, and money added to a goal
+      // is always savings. The database refuses to change either — so it is
+      // not sent rather than sent and rejected.
+      ...(locked ? {} : { category }),
       note: note.trim() === '' ? null : note.trim(),
       spentOn,
     });
@@ -248,12 +253,18 @@ function EditForm({
       <Field
         label="What it was for"
         htmlFor={`edit-category-${spend.id}`}
-        description={settled ? 'This paid a recurring bill, so it stays filed with that bill.' : undefined}
+        description={
+          settled
+            ? 'This paid a recurring bill, so it stays filed with that bill.'
+            : saved
+              ? 'This went into a savings goal, so it stays filed as savings.'
+              : undefined
+        }
       >
         <select
           id={`edit-category-${spend.id}`}
           value={category}
-          disabled={settled}
+          disabled={locked}
           onChange={(e) => setCategory(e.target.value)}
           className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`}
           style={inputStyle}

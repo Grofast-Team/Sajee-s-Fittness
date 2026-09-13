@@ -9,6 +9,7 @@ const groceries: ExistingSpend = {
   spentOn: '2026-09-10',
   intent: null,
   commitmentId: null,
+  savingsGoalId: null,
 };
 
 const rentPayment: ExistingSpend = {
@@ -19,6 +20,7 @@ const rentPayment: ExistingSpend = {
   spentOn: '2026-09-01',
   intent: null,
   commitmentId: 'commitment-rent',
+  savingsGoalId: null,
 };
 
 const rent: LinkedCommitment = { label: 'Rent', amountPaise: 1_200_000, otherPaidPaise: 0 };
@@ -115,6 +117,27 @@ describe('planSpendEdit', () => {
   it('never warns about an ordinary spend', () => {
     const plan = planSpendEdit(groceries, { amountPaise: 1, spentOn: '2025-01-01' }, null);
     expect(plan.ok && plan.changed && plan.warning).toBeNull();
+  });
+
+  it('refuses to recategorise money added to a savings goal', () => {
+    const contribution: ExistingSpend = { ...groceries, category: 'savings', savingsGoalId: 'goal-1' };
+    const plan = planSpendEdit(contribution, { category: 'eating_out' }, null);
+    expect(plan.ok).toBe(false);
+    if (!plan.ok) {
+      expect(plan.error).toMatch(/savings goal/);
+      expect(plan.error).toMatch(/remove it and record it again/i);
+    }
+  });
+
+  it('still lets a contribution’s amount and date be corrected', () => {
+    const contribution: ExistingSpend = { ...groceries, category: 'savings', savingsGoalId: 'goal-1' };
+    const plan = planSpendEdit(contribution, { amountPaise: 60_000, spentOn: '2026-09-11' }, null);
+    expect(plan).toEqual({
+      ok: true,
+      changed: true,
+      patch: { amountPaise: 60_000, spentOn: '2026-09-11' },
+      warning: null,
+    });
   });
 
   it('never scolds', () => {
