@@ -131,7 +131,10 @@ suite('Row Level Security', () => {
 
     it('never leaks Alice’s rows through any owner table', async () => {
       for (const table of OWNER_TABLES) {
-        const { data } = await bob.client.from(table).select('user_id');
+        const { data, error } = await bob.client.from(table).select('user_id');
+        // Without this a missing or misspelt table returns data: null, which
+        // reads as "nothing leaked" and passes.
+        expect(error, `${table} errored`).toBeNull();
         const foreign = (data ?? []).filter((r: { user_id: string }) => r.user_id !== bob.id);
         expect(foreign, `${table} leaked rows to another user`).toHaveLength(0);
       }
@@ -236,6 +239,7 @@ suite('Row Level Security', () => {
       'incomes',
       'step_segments',
       'step_validations',
+      'savings_goals',
     ] as const;
 
     let aliceSpendId: string;
@@ -284,6 +288,9 @@ suite('Row Level Security', () => {
           excluded_steps: 0,
           confidence: 'high',
         }),
+        alice.client
+          .from('savings_goals')
+          .insert({ user_id: alice.id, label: 'alice deposit', target_paise: 50_000_000 }),
       ]);
       for (const seed of seeds) expect(seed.error).toBeNull();
     }, 60_000);
@@ -567,6 +574,180 @@ suite('Row Level Security', () => {
 
       const admin = adminClient();
       for (const table of ['spends', 'spend_revisions']) {
+        const { data } = await admin.from(table).select('user_id').eq('user_id', doomed.id);
+        expect(data ?? [], `${table} kept rows for a deleted user`).toHaveLength(0);
+      }
+    }, 60_000);
+  });
+
+  describe('savings goals keep to their owner', () => {
+    let aliceGoalId: string;
+    let aliceOtherGoalId: string;
+    let bobGoalId: string;
+
+    beforeAll(async () => {
+      const [{ data: goal }, { data: other }, { data: bobs }] = await Promise.all([
+        alice.client
+          .from('savings_goals')
+          .insert({ user_id: alice.id, label: 'alice emergency', target_paise: 30_000_000 })
+          .select('id')
+          .single(),
+        alice.client
+          .from('savings_goals')
+          .insert({ user_id: alice.id, label: 'alice trip', target_paise: 8_000_000 })
+          .select('id')
+          .single(),
+        bob.client
+          .from('savings_goals')
+          .insert({ user_id: bob.id, label: 'bob bike', target_paise: 9_000_000 })
+          .select('id')
+          .single(),
+      ]);
+      aliceGoalId = goal!.id as string;
+      aliceOtherGoalId = other!.id as string;
+      bobGoalId = bobs!.id as string;
+    }, 60_000);
+
+    it('refuses a goal created on Alice’s behalf', async () => {
+      const { error } = await bob.client
+        .from('savings_goals')
+        .insert({ user_id: alice.id, label: 'not yours', target_paise: 100 });
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    });
+
+    // Foreign-key checks ignore RLS — the hole Feature 1 closed for
+    // commitment_id. The same guard has to cover the new link from day one.
+    it('refuses a contribution to another user’s goal', async () => {
+      const { error } = await bob.client.from('spends').insert({
+        user_id: bob.id,
+        amount_paise: 100,
+        category: 'savings',
+        savings_goal_id: aliceGoalId,
+      });
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    });
+
+    it('refuses to move a contribution onto another user’s goal', async () => {
+      const { data: own } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 1_000, category: 'savings', savings_goal_id: aliceGoalId })
+        .select('id')
+        .single();
+
+      const { error } = await alice.client
+        .from('spends')
+        .update({ savings_goal_id: bobGoalId })
+        .eq('id', own!.id);
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    });
+
+    it('refuses a contribution that is not filed as savings', async () => {
+      const { error } = await alice.client.from('spends').insert({
+        user_id: alice.id,
+        amount_paise: 1_000,
+        category: 'groceries',
+        savings_goal_id: aliceGoalId,
+      });
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('23514');
+    });
+
+    it('will not recategorise a contribution', async () => {
+      const { data: contribution } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 2_000, category: 'savings', savings_goal_id: aliceGoalId })
+        .select('id')
+        .single();
+
+      const { error } = await alice.client
+        .from('spends')
+        .update({ category: 'eating_out' })
+        .eq('id', contribution!.id);
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('23514');
+    });
+
+    it('records a contribution moved to another goal in the history', async () => {
+      const { data: contribution } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 3_000, category: 'savings', savings_goal_id: aliceGoalId })
+        .select('id')
+        .single();
+
+      const { error } = await alice.client
+        .from('spends')
+        .update({ savings_goal_id: aliceOtherGoalId })
+        .eq('id', contribution!.id);
+      expect(error).toBeNull();
+
+      const { data: revisions } = await alice.client
+        .from('spend_revisions')
+        .select('changed_fields, before')
+        .eq('spend_id', contribution!.id);
+      expect(revisions).toHaveLength(1);
+      expect(revisions![0].changed_fields).toEqual(['savings_goal_id']);
+      expect((revisions![0].before as { savings_goal_id: string }).savings_goal_id).toBe(aliceGoalId);
+    });
+
+    // The money really moved, so removing the goal must not remove the record
+    // of it — only the link.
+    it('keeps contributions as savings when their goal is removed', async () => {
+      const { data: goal } = await alice.client
+        .from('savings_goals')
+        .insert({ user_id: alice.id, label: 'alice abandoned', target_paise: 1_000_000 })
+        .select('id')
+        .single();
+      const { data: contribution } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 4_000, category: 'savings', savings_goal_id: goal!.id })
+        .select('id')
+        .single();
+
+      const { error } = await alice.client.from('savings_goals').delete().eq('id', goal!.id);
+      expect(error).toBeNull();
+
+      const { data: after } = await alice.client
+        .from('spends')
+        .select('category, savings_goal_id, amount_paise')
+        .eq('id', contribution!.id)
+        .single();
+      expect(after!.savings_goal_id).toBeNull();
+      expect(after!.category).toBe('savings');
+      expect(Number(after!.amount_paise)).toBe(4_000);
+
+      const { data: revisions } = await alice.client
+        .from('spend_revisions')
+        .select('changed_fields')
+        .eq('spend_id', contribution!.id);
+      expect(revisions).toHaveLength(1);
+      expect(revisions![0].changed_fields).toEqual(['savings_goal_id']);
+    });
+
+    // Deleting a user cascades to goals (setting spends.savings_goal_id to
+    // null, which fires the revision trigger) and to spends. The trap from
+    // 20260829100014 in a new shape.
+    it('still deletes an account with goals and contributions', async () => {
+      const doomed = await createTestUser('doomed-savings');
+      const { data: goal } = await doomed.client
+        .from('savings_goals')
+        .insert({ user_id: doomed.id, label: 'doomed', target_paise: 1_000_000 })
+        .select('id')
+        .single();
+      await doomed.client.from('spends').insert({
+        user_id: doomed.id,
+        amount_paise: 1_000,
+        category: 'savings',
+        savings_goal_id: goal!.id,
+      });
+
+      const { error } = await adminClient().auth.admin.deleteUser(doomed.id);
+      expect(error, 'account deletion failed').toBeNull();
+
+      const admin = adminClient();
+      for (const table of ['savings_goals', 'spends', 'spend_revisions']) {
         const { data } = await admin.from(table).select('user_id').eq('user_id', doomed.id);
         expect(data ?? [], `${table} kept rows for a deleted user`).toHaveLength(0);
       }
