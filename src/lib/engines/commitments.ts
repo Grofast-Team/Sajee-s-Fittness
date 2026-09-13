@@ -65,6 +65,14 @@ export interface CommitmentSummary {
 /** How close a due date has to be before it is worth surfacing. */
 export const DUE_SOON_DAYS = 5;
 
+/**
+ * Share of a commitment that counts as settling it.
+ *
+ * ₹11,950 by bank transfer settles a ₹12,000 rent. Exported because editing a
+ * payment must use the same line to know when an edit would un-pay a bill.
+ */
+export const PAID_THRESHOLD = 0.95;
+
 const DAY_MS = 86_400_000;
 
 /**
@@ -156,7 +164,7 @@ export function summariseCommitments(input: CommitmentInput): CommitmentSummary 
      * month, and the whole point of this panel is that the outstanding figure
      * can be trusted.
      */
-    const paid = paidPaise >= commitment.amountPaise * 0.95;
+    const paid = paidPaise >= commitment.amountPaise * PAID_THRESHOLD;
     const daysUntilDue = Math.round((dueDate.getTime() - today.getTime()) / DAY_MS);
 
     statuses.push({
