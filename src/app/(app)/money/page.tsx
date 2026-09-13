@@ -4,9 +4,11 @@ import { SpendEntry } from '@/components/spend-entry';
 import { MonthlyLimit } from '@/components/monthly-limit';
 import { FoodSpendPanel } from '@/components/food-spend-panel';
 import { CommitmentsPanel } from '@/components/commitments-panel';
+import { SalaryPanel } from '@/components/salary-panel';
 import { getMoneyMonth } from '@/lib/data/money';
 import { getFoodSpend } from '@/lib/data/food-spend';
 import { getCommitments } from '@/lib/data/commitments';
+import { getSalaryView } from '@/lib/data/salary';
 import { CATEGORIES, categoryLabel, formatRupees, type CategoryTotal } from '@/lib/engines/money';
 
 /**
@@ -74,7 +76,7 @@ export default async function MoneyPage() {
    * month look under budget until the last day of it.
    */
   const todayIso = new Date().toISOString().slice(0, 10);
-  const [foodSpend, commitments] = await Promise.all([
+  const [foodSpend, commitments, salary] = await Promise.all([
     getFoodSpend(window.start, todayIso),
     /*
      * `summary.totalPaise` already includes any commitment settled this month,
@@ -88,6 +90,7 @@ export default async function MoneyPage() {
       summary.totalPaise,
       window.daysLeft,
     ),
+    getSalaryView(window.start, window.end),
   ]);
 
   const spent = summary.totalPaise;
@@ -190,6 +193,14 @@ export default async function MoneyPage() {
         </div>
 
         <div className="space-y-4 lg:space-y-5">
+          {/* The question people actually ask on the 25th. It leads the column
+              because it reframes everything below it as a share of what came in. */}
+          {salary ? (
+            <Panel>
+              <SalaryPanel view={salary} canEdit={!view.isSample} />
+            </Panel>
+          ) : null}
+
           <Panel>
             <Section
               title="Where it went"

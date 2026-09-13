@@ -134,3 +134,61 @@ tests/                    vitest suites, mirroring src/lib/engines
 `src/lib/engines` is the heart of the product. Every file in it is a pure function
 of its inputs — no database, no network, no clock reads. That is what makes the
 nutrition and safety logic testable, and it is why the numbers can be trusted.
+
+---
+
+## 8. Decision record: the "Life OS" proposal (September 2026)
+
+A proposal arrived to rebuild this as a general personal operating system —
+health, money and life on one data model. The **product direction was
+adopted**. Three of its **architectural recommendations were not**, and the
+reasons are recorded here so the question does not have to be re-argued.
+
+### Rejected: Prisma and Better Auth in place of the Supabase client and Auth
+
+Isolation between users is enforced **inside Postgres** by row-level security:
+every user-owned table carries owner-only policies keyed on `auth.uid()`, which
+comes from the Supabase Auth JWT. At the time of writing that is over seventy
+policies.
+
+Prisma connects as a single database role and does not set the JWT claims
+those policies read. Adopting it means either running as a role that bypasses
+RLS — moving authorization for salary, spending and menstrual-cycle data into
+application code, where one missing `where user_id = …` is a cross-user leak —
+or re-implementing per-request claim setting, which interacts badly with
+transaction-mode connection pooling. Replacing Supabase Auth breaks
+`auth.uid()` outright.
+
+The proposal's own security section asks that "user A cannot read user B's
+expenses" be enforced server-side. RLS is a stronger guarantee than that, not a
+weaker one: it holds even when the application code is wrong.
+
+### Rejected: a duplicated `events` table as the source of truth
+
+Writing every action to both its own table and a generic event log creates two
+records of the same fact, and they drift. This codebase has consistently
+avoided that — paying a commitment writes an ordinary `spends` row rather than a
+separate paid flag, and the food cost estimate is never summed into spending.
+
+A unified timeline, when built, should be a **read-time view** unioning the real
+tables, not a second ledger.
+
+### Rejected: restructuring into features / services / repositories
+
+The existing split already is that layering: `lib/engines/` holds pure,
+tested domain logic with no I/O; `lib/data/` holds reads; `lib/actions/` holds
+validated writes; pages compose them. Renaming folders to match a template
+would be churn with no behavioural gain.
+
+### Adopted
+
+- Answer questions rather than display numbers.
+- Rules before AI; the model explains, it does not compute.
+- Source, timestamp and confidence on data that has provenance.
+- Income as a ledger with history, never an overwritten figure.
+- No bank credentials. Automatic transaction import, when it comes, goes
+  through India's consent-based Account Aggregator framework via a regulated
+  partner, and lands as raw records normalized separately — never directly
+  into `spends`.
+- Need / want classification, with ambiguous categories left unclassified
+  rather than guessed.

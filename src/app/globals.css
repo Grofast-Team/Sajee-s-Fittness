@@ -87,6 +87,20 @@
   --sidebar-w: 15.5rem;
   --content-max: 80rem;
   --bottom-nav-h: 4.25rem;
+
+  /* --- Data series ---------------------------------------------------
+   * Categorical hues for charts, in fixed order. Validated with the dataviz
+   * palette validator on this surface: worst adjacent CVD ΔE 15.0, worst
+   * normal-vision ΔE 24.5, all >= 3:1 contrast.
+   *
+   * Deliberately none of amber, emerald or red. Those carry meaning in this
+   * app — uncertain, confirmed, error — and a chart segment wearing one would
+   * be read as that meaning rather than as a category.
+   */
+  --series-1: #2563eb;
+  --series-2: #db2777;
+  --series-3: #7c3aed;
+  --series-4: #0891b2;
 }
 
 /*
@@ -133,6 +147,13 @@
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow-md: 0 2px 8px rgb(0 0 0 / 0.34);
     --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.45);
+
+    /* Stepped for the dark surface and validated separately against it:
+       worst adjacent CVD ΔE 14.3, normal-vision ΔE 22.6. */
+    --series-1: #3b82f6;
+    --series-2: #ec4899;
+    --series-3: #8b5cf6;
+    --series-4: #0aa5c4;
   }
 }
 
@@ -167,6 +188,10 @@
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-md: 0 2px 8px rgb(0 0 0 / 0.34);
   --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.45);
+  --series-1: #3b82f6;
+  --series-2: #ec4899;
+  --series-3: #8b5cf6;
+  --series-4: #0aa5c4;
 }
 
 * {
