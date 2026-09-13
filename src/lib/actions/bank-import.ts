@@ -12,6 +12,7 @@ import {
   type MerchantRule,
 } from '@/lib/engines/bank-import';
 import { insertSpends } from '@/lib/spends/record';
+import { allRows } from '@/lib/data/paged';
 
 /**
  * Staging and confirming a bank statement.
@@ -77,15 +78,20 @@ export async function stageImport(input: unknown): Promise<StageResult> {
 
   const [rulesRes, existingRes] = await Promise.all([
     supabase.from('merchant_rules').select('merchant_key, category').eq('user_id', userId),
+    // Every spend in the statement's range, paged: a duplicate missed because
+    // it sat past the thousandth row would be recorded twice.
     dates.length === 0
-      ? Promise.resolve({ data: [], error: null })
-      : supabase
-          .from('spends')
-          .select('id, spent_on, amount_paise')
-          .eq('user_id', userId)
-          .gte('spent_on', shift(dates[0], -1))
-          .lte('spent_on', shift(dates[dates.length - 1], 1))
-          .limit(10_000),
+      ? Promise.resolve({ rows: [], error: null })
+      : allRows((lo, hi) =>
+          supabase
+            .from('spends')
+            .select('id, spent_on, amount_paise')
+            .eq('user_id', userId)
+            .gte('spent_on', shift(dates[0], -1))
+            .lte('spent_on', shift(dates[dates.length - 1], 1))
+            .order('id', { ascending: true })
+            .range(lo, hi),
+        ),
   ]);
 
   if (rulesRes.error) {
@@ -100,7 +106,7 @@ export async function stageImport(input: unknown): Promise<StageResult> {
 
   const duplicates = markDuplicates(
     normalized,
-    (existingRes.data ?? []).map((s) => ({
+    existingRes.rows.map((s) => ({
       id: s.id as string,
       spentOn: s.spent_on as string,
       amountPaise: Number(s.amount_paise),
@@ -217,19 +223,22 @@ export async function confirmImport(input: unknown): Promise<ImportResult> {
     .maybeSingle();
   if (!batch) return { ok: false, error: 'We could not find that import.' };
 
-  const { data: rowData, error: rowsError } = await supabase
-    .from('import_rows')
-    .select(
-      'id, user_id, batch_id, row_number, raw, occurred_on, description, amount_paise, direction, problem, merchant_key, category, category_source, duplicate_of_spend, duplicate_of_row',
-    )
-    .eq('batch_id', batchId)
-    .eq('user_id', userId)
-    .eq('status', 'pending')
-    .order('row_number', { ascending: true })
-    .limit(MAX_ROWS + 1);
+  // Paged: confirming a 3,000-line statement must not quietly stop at a thousand.
+  const { rows: rowData, error: rowsError } = await allRows((lo, hi) =>
+    supabase
+      .from('import_rows')
+      .select(
+        'id, user_id, batch_id, row_number, raw, occurred_on, description, amount_paise, direction, problem, merchant_key, category, category_source, duplicate_of_spend, duplicate_of_row',
+      )
+      .eq('batch_id', batchId)
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .order('row_number', { ascending: true })
+      .range(lo, hi),
+  );
   if (rowsError) return { ok: false, error: 'We could not read that import.' };
 
-  const pending = (rowData ?? []).map((r) => ({ ...r, amount_paise: Number(r.amount_paise) })) as PendingRow[];
+  const pending = rowData.map((r) => ({ ...r, amount_paise: Number(r.amount_paise) })) as PendingRow[];
   if (pending.length === 0) return { ok: true, message: 'Everything in this import has already been dealt with.' };
 
   const byId = new Map(decisions.map((d) => [d.rowId, d]));
