@@ -177,4 +177,14 @@ export const OWNER_TABLES = [
   'plan_feedback',
   'notification_prefs',
   'notifications',
+  // Money and step validation. These have carried owner-only policies since
+  // they were created, and were missing from this list until 2026-09-13 — so
+  // the guarantee in the comment above did not actually hold for them.
+  'spends',
+  'money_settings',
+  'commitments',
+  'income_sources',
+  'incomes',
+  'step_segments',
+  'step_validations',
 ] as const;

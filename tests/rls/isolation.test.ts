@@ -225,6 +225,132 @@ suite('Row Level Security', () => {
     });
   });
 
+  // --- money --------------------------------------------------------------
+
+  describe('money stays with its owner', () => {
+    const MONEY_TABLES = [
+      'spends',
+      'money_settings',
+      'commitments',
+      'income_sources',
+      'incomes',
+      'step_segments',
+      'step_validations',
+    ] as const;
+
+    let aliceSpendId: string;
+
+    beforeAll(async () => {
+      const { data: spend, error: spendError } = await alice.client
+        .from('spends')
+        .insert({
+          user_id: alice.id,
+          spent_on: '2026-01-15',
+          amount_paise: 45_000,
+          category: 'medical',
+          note: 'alice private pharmacy',
+        })
+        .select('id')
+        .single();
+      expect(spendError).toBeNull();
+      aliceSpendId = spend!.id as string;
+
+      const seeds = await Promise.all([
+        alice.client
+          .from('money_settings')
+          .upsert({ user_id: alice.id, monthly_limit_paise: 5_000_000 }, { onConflict: 'user_id' }),
+        alice.client
+          .from('commitments')
+          .insert({ user_id: alice.id, label: 'alice rent', amount_paise: 1_200_000, category: 'rent' }),
+        alice.client
+          .from('income_sources')
+          .insert({ user_id: alice.id, label: 'alice salary', kind: 'salary' }),
+        alice.client
+          .from('incomes')
+          .insert({ user_id: alice.id, amount_paise: 5_000_000, received_on: '2026-01-01' }),
+        alice.client.from('step_segments').insert({
+          user_id: alice.id,
+          log_date: '2026-01-15',
+          started_at: '2026-01-15T08:00:00Z',
+          ended_at: '2026-01-15T08:30:00Z',
+          steps: 3000,
+          platform_id: `rls-${alice.id}`,
+        }),
+        alice.client.from('step_validations').insert({
+          user_id: alice.id,
+          log_date: '2026-01-15',
+          raw_steps: 3000,
+          validated_steps: 3000,
+          excluded_steps: 0,
+          confidence: 'high',
+        }),
+      ]);
+      for (const seed of seeds) expect(seed.error).toBeNull();
+    }, 60_000);
+
+    it('has something of Alice’s in every money table, so the checks below mean something', async () => {
+      const admin = adminClient();
+      for (const table of MONEY_TABLES) {
+        const { data } = await admin.from(table).select('user_id').eq('user_id', alice.id);
+        expect((data ?? []).length, `${table} has no row for Alice`).toBeGreaterThan(0);
+      }
+    });
+
+    it('never shows Bob a row of Alice’s money', async () => {
+      for (const table of MONEY_TABLES) {
+        const { data } = await bob.client.from(table).select('user_id');
+        const foreign = (data ?? []).filter((r: { user_id: string }) => r.user_id !== bob.id);
+        expect(foreign, `${table} leaked rows to another user`).toHaveLength(0);
+      }
+    }, 60_000);
+
+    it('silently changes nothing when Bob edits Alice’s spend', async () => {
+      const { data } = await bob.client
+        .from('spends')
+        .update({ amount_paise: 1 })
+        .eq('id', aliceSpendId)
+        .select();
+      expect(data ?? []).toHaveLength(0);
+
+      const { data: after } = await alice.client
+        .from('spends')
+        .select('amount_paise')
+        .eq('id', aliceSpendId)
+        .single();
+      expect(Number(after!.amount_paise)).toBe(45_000);
+    });
+
+    it('refuses to move Bob’s own spend onto Alice’s account', async () => {
+      const { data: own } = await bob.client
+        .from('spends')
+        .insert({ user_id: bob.id, amount_paise: 100, category: 'other' })
+        .select('id')
+        .single();
+
+      const { error } = await bob.client
+        .from('spends')
+        .update({ user_id: alice.id })
+        .eq('id', own!.id);
+      expect(error).not.toBeNull();
+      // The row would fail the policy's WITH CHECK after the update.
+      expect(error!.code).toBe('42501');
+    });
+
+    it('cannot delete Alice’s spend', async () => {
+      await bob.client.from('spends').delete().eq('id', aliceSpendId);
+      const { data } = await alice.client.from('spends').select('id').eq('id', aliceSpendId);
+      expect(data ?? []).toHaveLength(1);
+    });
+
+    it('refuses income recorded on Alice’s behalf', async () => {
+      const { error } = await bob.client
+        .from('incomes')
+        .insert({ user_id: alice.id, amount_paise: 100 });
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    });
+  });
+
   // --- reference data -----------------------------------------------------
 
   describe('shared reference data', () => {
