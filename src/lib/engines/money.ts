@@ -71,6 +71,22 @@ export const SPEND_CATEGORY_IDS = CATEGORIES.map((c) => c.id) as [
 
 const LABELS = new Map(CATEGORIES.map((c) => [c.id, c.label]));
 
+/**
+ * Whether money filed under a category counts against the monthly amount.
+ *
+ * Savings do not. Money moved into savings is kept, not spent: the ring says
+ * "Spent" and the monthly amount asks what someone plans to *spend*, so a
+ * ₹2,500 deposit into a trip fund reading as "₹2,500 spent" contradicted both.
+ * Set-aside money is still shown — beside the spending, never inside it — and
+ * "where did my salary go" still counts it as set aside.
+ *
+ * Decided 2026-09-13. This is the one place the rule lives; the commitments
+ * engine follows it for savings commitments.
+ */
+export function countsAsSpending(category: string): boolean {
+  return category !== 'savings';
+}
+
 export function categoryLabel(id: string): string {
   return LABELS.get(id as SpendCategory) ?? 'Other';
 }
@@ -205,7 +221,10 @@ export interface CategoryTotal {
 }
 
 export interface MonthSummary {
+  /** Spending only. Money set aside is in `setAsidePaise`, not here. */
   totalPaise: number;
+  /** Money filed as savings this month. Not counted against the limit. */
+  setAsidePaise: number;
   /** Null when no limit has been set — different from a limit of zero. */
   limitPaise: number | null;
   remainingPaise: number | null;
@@ -230,10 +249,14 @@ export interface MonthSummary {
  * instead of it, and the wording never states it as what *will* happen.
  */
 export function summariseMonth(
-  spends: Spend[],
+  allSpends: Spend[],
   window: MonthWindow,
   limitPaise: number | null,
 ): MonthSummary {
+  const spends = allSpends.filter((s) => countsAsSpending(s.category));
+  const setAsidePaise = allSpends
+    .filter((s) => !countsAsSpending(s.category))
+    .reduce((sum, s) => sum + s.amountPaise, 0);
   const totalPaise = spends.reduce((sum, s) => sum + s.amountPaise, 0);
 
   const grouped = new Map<string, number>();
@@ -264,6 +287,7 @@ export function summariseMonth(
 
   return {
     totalPaise,
+    setAsidePaise,
     limitPaise,
     remainingPaise,
     byCategory,
@@ -279,6 +303,7 @@ export function summariseMonth(
       dailyAllowancePaise,
       window,
       spendCount: spends.length,
+      setAsidePaise,
     }),
   };
 }
@@ -291,11 +316,18 @@ function buildMessage(input: {
   dailyAllowancePaise: number | null;
   window: MonthWindow;
   spendCount: number;
+  setAsidePaise: number;
 }): string {
   const { totalPaise, limitPaise, remainingPaise, projectedPaise, window } = input;
 
   if (input.spendCount === 0) {
-    return 'Nothing recorded this month yet. Add the last thing you paid for — even a small one.';
+    // A month with a deposit into savings and nothing else is not empty, and
+    // telling someone who just saved ₹2,500 that nothing is recorded would be
+    // plainly wrong.
+    return input.setAsidePaise > 0
+      ? `${formatRupees(input.setAsidePaise)} set aside and no spending recorded yet this month. ` +
+          `Add the last thing you paid for — even a small one.`
+      : 'Nothing recorded this month yet. Add the last thing you paid for — even a small one.';
   }
 
   if (limitPaise === null) {

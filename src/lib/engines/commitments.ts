@@ -1,3 +1,5 @@
+import { countsAsSpending } from '@/lib/engines/money';
+
 /**
  * Money already promised, and what that leaves genuinely free.
  *
@@ -48,6 +50,13 @@ export interface CommitmentSummary {
   dueThisPeriodPaise: number;
   paidPaise: number;
   outstandingPaise: number;
+  /**
+   * The part of `outstandingPaise` going into savings — a SIP, a recurring
+   * deposit. Still owed, so still in the outstanding figure, but not taken off
+   * what is free: savings do not count against the monthly amount once paid,
+   * so they cannot reduce it before they are paid either.
+   */
+  outstandingSavingsPaise: number;
   /**
    * What is left once the outstanding commitments are set aside.
    * Null when no monthly amount has been set — there is nothing to be free of.
@@ -182,6 +191,9 @@ export function summariseCommitments(input: CommitmentInput): CommitmentSummary 
   const dueThisPeriodPaise = statuses.reduce((s, x) => s + x.commitment.amountPaise, 0);
   const paidPaise = statuses.filter((s) => s.paid).reduce((s, x) => s + x.commitment.amountPaise, 0);
   const outstandingPaise = dueThisPeriodPaise - paidPaise;
+  const outstandingSavingsPaise = statuses
+    .filter((s) => !s.paid && !countsAsSpending(s.commitment.category))
+    .reduce((sum, s) => sum + s.commitment.amountPaise, 0);
 
   /*
    * Free money.
@@ -190,9 +202,15 @@ export function summariseCommitments(input: CommitmentInput): CommitmentSummary 
    * paying one writes an ordinary spend. Subtracting only the *outstanding*
    * amount is therefore correct — subtracting the full due figure would
    * double-count everything already settled.
+   *
+   * Outstanding savings are left out for the same reason paid ones are: the
+   * monthly total does not count them (`countsAsSpending`), so subtracting an
+   * unpaid SIP here would make paying it hand the money back.
    */
   const freePaise =
-    input.limitPaise === null ? null : input.limitPaise - input.spentPaise - outstandingPaise;
+    input.limitPaise === null
+      ? null
+      : input.limitPaise - input.spentPaise - (outstandingPaise - outstandingSavingsPaise);
 
   const freePerDayPaise =
     freePaise === null ? null : Math.floor(freePaise / Math.max(1, input.daysLeft));
@@ -207,9 +225,17 @@ export function summariseCommitments(input: CommitmentInput): CommitmentSummary 
     dueThisPeriodPaise,
     paidPaise,
     outstandingPaise,
+    outstandingSavingsPaise,
     freePaise,
     freePerDayPaise,
-    message: messageFor({ statuses, outstandingPaise, freePaise, freePerDayPaise, overdue }),
+    message: messageFor({
+      statuses,
+      outstandingPaise,
+      outstandingSavingsPaise,
+      freePaise,
+      freePerDayPaise,
+      overdue,
+    }),
     dueSoon,
     overdue,
   };
@@ -227,6 +253,7 @@ const rupees = (paise: number) => `₹${Math.round(paise / 100).toLocaleString('
 function messageFor(input: {
   statuses: CommitmentStatus[];
   outstandingPaise: number;
+  outstandingSavingsPaise: number;
   freePaise: number | null;
   freePerDayPaise: number | null;
   overdue: CommitmentStatus[];
@@ -241,7 +268,13 @@ function messageFor(input: {
       : `Everything due this month is paid. ${rupees(input.freePaise)} of your plan is left.`;
   }
 
-  const owed = `${rupees(input.outstandingPaise)} still to go out this month`;
+  // Said whenever a free figure is shown, so the arithmetic on screen adds up:
+  // without it, "₹17,599 to go out, leaving ₹4,401 free" does not.
+  const owed =
+    `${rupees(input.outstandingPaise)} still to go out this month` +
+    (input.outstandingSavingsPaise > 0 && input.freePaise !== null
+      ? ` (${rupees(input.outstandingSavingsPaise)} of that goes into savings, which is not counted against what you plan to spend)`
+      : '');
 
   if (input.freePaise === null) {
     return `${owed}. Set a monthly amount and we can show what that leaves free.`;

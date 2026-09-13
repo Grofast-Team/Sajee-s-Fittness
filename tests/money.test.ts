@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countsAsSpending,
   formatRupees,
   monthWindow,
   parseAmountToPaise,
@@ -174,5 +175,37 @@ describe('summariseMonth', () => {
   it('does not offer a negative daily allowance', () => {
     const s = summariseMonth(spends([15000, 'rent']), window, 1000000);
     expect(s.dailyAllowancePaise).toBe(0);
+  });
+});
+
+/*
+ * Money moved into savings is kept, not spent. The ring is labelled "Spent" and
+ * the monthly amount is "what you plan to spend", so a ₹2,500 deposit into a
+ * trip fund reading as "₹2,500 spent" contradicted both.
+ */
+describe('savings and the monthly amount', () => {
+  const window = monthWindow(new Date(2026, 8, 15), 1);
+
+  it('does not count money set aside as spending', () => {
+    expect(countsAsSpending('savings')).toBe(false);
+    expect(countsAsSpending('groceries')).toBe(true);
+
+    const s = summariseMonth(spends([2000, 'groceries'], [2500, 'savings']), window, 1000000);
+    expect(s.totalPaise).toBe(200000);
+    expect(s.setAsidePaise).toBe(250000);
+    expect(s.remainingPaise).toBe(800000);
+  });
+
+  it('leaves savings out of where the spending went', () => {
+    const s = summariseMonth(spends([2000, 'groceries'], [2500, 'savings']), window, null);
+    expect(s.byCategory.map((c) => c.category)).toEqual(['groceries']);
+    expect(s.byCategory[0].share).toBe(1);
+  });
+
+  it('does not call a month with only savings in it empty', () => {
+    const s = summariseMonth(spends([2500, 'savings']), window, 1000000);
+    expect(s.totalPaise).toBe(0);
+    expect(s.message).not.toMatch(/nothing recorded/i);
+    expect(s.message).toContain('₹2,500');
   });
 });

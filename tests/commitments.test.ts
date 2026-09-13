@@ -188,3 +188,38 @@ describe('the wording', () => {
     expect(r.message).toMatch(/everything due this month is paid/i);
   });
 });
+
+/*
+ * A monthly SIP set up as a commitment is still money due out, so it stays in
+ * the outstanding figure. It is not spending, though, and paying it does not
+ * count against the monthly amount — so it cannot reduce what is free before
+ * it is paid either, or paying it would make money appear.
+ */
+describe('savings commitments', () => {
+  const sip: Commitment = { ...rent, id: 'sip', label: 'SIP', amountPaise: 500_000, category: 'savings', dueDay: 15 };
+
+  it('owes a savings commitment without taking it out of what is free', () => {
+    const r = summariseCommitments({ ...base, commitments: [rent, phone, sip] });
+    expect(r.outstandingPaise).toBe(1_759_900);
+    expect(r.outstandingSavingsPaise).toBe(500_000);
+    // ₹25,000 − ₹8,000 spent − ₹12,599 owed on spending = ₹4,401, as without it.
+    expect(r.freePaise).toBe(440_100);
+  });
+
+  it('keeps the free figure the same before and after the SIP is paid', () => {
+    const before = summariseCommitments({ ...base, commitments: [rent, phone, sip] });
+    // Paying it writes a savings spend, which the monthly total leaves out.
+    const after = summariseCommitments({
+      ...base,
+      commitments: [rent, phone, sip],
+      paidByCommitment: { sip: 500_000 },
+    });
+    expect(after.freePaise).toBe(before.freePaise);
+    expect(after.outstandingSavingsPaise).toBe(0);
+  });
+
+  it('says why the savings part is not taken off what is free', () => {
+    const r = summariseCommitments({ ...base, commitments: [rent, phone, sip] });
+    expect(r.message).toMatch(/₹5,000 of that goes into savings/);
+  });
+});

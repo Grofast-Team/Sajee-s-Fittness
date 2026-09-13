@@ -148,6 +148,16 @@ export default async function MoneyPage() {
                 {summary.message}
               </p>
 
+              {/* Beside the spending, never inside it: kept money is not spent
+                  money, and counting it against the plan made saving look like
+                  overspending. See countsAsSpending. */}
+              {summary.setAsidePaise > 0 && summary.totalPaise > 0 ? (
+                <p className="mt-2 text-[13px] leading-relaxed" style={{ color: 'var(--fg-subtle)' }}>
+                  <span className="data">{formatRupees(summary.setAsidePaise)}</span> set aside as
+                  savings this month as well — kept, not spent, so it is not counted here.
+                </p>
+              ) : null}
+
               {limit !== null ? (
                 <Why label="How this is worked out">
                   <p>
@@ -160,6 +170,10 @@ export default async function MoneyPage() {
                     That is about <span className="data">{formatRupees(summary.averagePerDayPaise)}</span>{' '}
                     a day so far. Carrying on at that rate would finish the month near{' '}
                     <span className="data">{formatRupees(summary.projectedPaise)}</span>.
+                  </p>
+                  <p className="mt-2">
+                    Money filed as savings is not part of this. It is kept rather than spent, so
+                    putting money towards a goal never makes the month look overspent.
                   </p>
                   <p className="mt-2">
                     Only what you have actually recorded is counted here. If something is missing,
@@ -226,10 +240,20 @@ export default async function MoneyPage() {
                 </div>
               ) : (
                 <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-                  Nothing recorded yet this month. Add the last thing you paid for and it will
-                  appear here.
+                  {summary.setAsidePaise > 0 ? 'No spending' : 'Nothing'} recorded yet this month.
+                  Add the last thing you paid for and it will appear here.
                 </p>
               )}
+
+              {summary.setAsidePaise > 0 ? (
+                <p className="mt-3 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
+                  <span aria-hidden>🏦</span> Set aside as savings:{' '}
+                  <span className="data" style={{ color: 'var(--fg)', fontWeight: 600 }}>
+                    {formatRupees(summary.setAsidePaise)}
+                  </span>{' '}
+                  — not included above.
+                </p>
+              ) : null}
             </Section>
           </Panel>
 
