@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Alert, inputStyle } from '@/components/ui';
 import { CATEGORIES, formatRupees, parseAmountToPaise } from '@/lib/engines/money';
@@ -31,29 +31,39 @@ const QUICK = ['groceries', 'eating_out', 'transport', 'phone_internet', 'househ
 export function SpendEntry({ canSave }: { canSave: boolean }) {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  // Which button was tapped, for its spinner. Cleared in the same commit as the
+  // refreshed month, so the ring and "₹X recorded" change together.
   const [saving, setSaving] = useState<string | null>(null);
   const [state, setState] = useState<MoneyResult | null>(null);
+  const [, startTransition] = useTransition();
   const amountRef = useRef<HTMLInputElement>(null);
 
   const paise = parseAmountToPaise(amount);
   const ready = paise !== null && canSave;
 
-  async function save(category: string) {
+  function save(category: string) {
     if (paise === null) return;
     setSaving(category);
     setState(null);
 
-    const result = await logSpend({ amountPaise: paise, category, note: note.trim() || undefined });
+    startTransition(async () => {
+      const result = await logSpend({ amountPaise: paise, category, note: note.trim() || undefined });
 
-    setState(result);
-    if (result.ok) {
-      setAmount('');
-      setNote('');
+      // Wrapped again: state set after an await is not part of the outer
+      // transition, and would otherwise land before the new total does.
+      startTransition(() => {
+        setState(result);
+        if (result.ok) {
+          setAmount('');
+          setNote('');
+        }
+        setSaving(null);
+      });
+
       // Straight back to the amount box: recording two things in a row is the
       // normal case, not the exception.
-      amountRef.current?.focus();
-    }
-    setSaving(null);
+      if (result.ok) amountRef.current?.focus();
+    });
   }
 
   return (

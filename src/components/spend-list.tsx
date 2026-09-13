@@ -42,13 +42,20 @@ export function SpendList({ spends, canEdit }: { spends: SpendRow[]; canEdit: bo
     );
   }
 
+  /*
+   * State set after an `await` is not part of the transition unless wrapped
+   * again. Unwrapped, "Removed." committed before the refreshed list did, so
+   * the removed spend sat under its own confirmation for most of a second.
+   */
   function remove(id: string) {
     startTransition(async () => {
       const result = await deleteSpend(id);
-      setConfirming(null);
-      setNotice(
-        result.ok ? { tone: 'success', text: result.message } : { tone: 'error', text: result.error },
-      );
+      startTransition(() => {
+        setConfirming(null);
+        setNotice(
+          result.ok ? { tone: 'success', text: result.message } : { tone: 'error', text: result.error },
+        );
+      });
     });
   }
 
@@ -177,45 +184,47 @@ function EditForm({
   const [note, setNote] = useState(spend.note ?? '');
   const [spentOn, setSpentOn] = useState(spend.spentOn);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // A transition, so the form closes with the corrected row already in place.
+  const [saving, startTransition] = useTransition();
 
   const settled = spend.commitmentId !== null;
   const saved = spend.savingsGoalId !== null;
   const locked = settled || saved;
 
-  async function save() {
+  function save() {
     const paise = parseAmountToPaise(amount);
     if (paise === null || paise <= 0) {
       setError('Enter an amount greater than zero.');
       return;
     }
 
-    setSaving(true);
     setError(null);
 
-    const result = await updateSpend({
-      id: spend.id,
-      amountPaise: paise,
-      // A bill payment's category follows the bill, and money added to a goal
-      // is always savings. The database refuses to change either — so it is
-      // not sent rather than sent and rejected.
-      ...(locked ? {} : { category }),
-      note: note.trim() === '' ? null : note.trim(),
-      spentOn,
+    startTransition(async () => {
+      const result = await updateSpend({
+        id: spend.id,
+        amountPaise: paise,
+        // A bill payment's category follows the bill, and money added to a goal
+        // is always savings. The database refuses to change either — so it is
+        // not sent rather than sent and rejected.
+        ...(locked ? {} : { category }),
+        note: note.trim() === '' ? null : note.trim(),
+        spentOn,
+      });
+
+      startTransition(() => {
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+
+        onDone(
+          result.warning
+            ? { tone: 'warning', text: result.warning }
+            : { tone: 'success', text: result.message },
+        );
+      });
     });
-
-    setSaving(false);
-
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-
-    onDone(
-      result.warning
-        ? { tone: 'warning', text: result.warning }
-        : { tone: 'success', text: result.message },
-    );
   }
 
   return (

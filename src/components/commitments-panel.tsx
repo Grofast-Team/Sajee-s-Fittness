@@ -33,8 +33,11 @@ export function CommitmentsPanel({
     setState(null);
     startTransition(async () => {
       const result = await fn();
-      setState({ ok: result.ok, text: result.ok ? (result.message ?? '') : (result.error ?? '') });
-      setBusyId(null);
+      // Wrapped again, or "Paid" lands while the bill still shows as owed.
+      startTransition(() => {
+        setState({ ok: result.ok, text: result.ok ? (result.message ?? '') : (result.error ?? '') });
+        setBusyId(null);
+      });
     });
   }
 
@@ -189,17 +192,19 @@ function AddForm({ onDone }: { onDone: (r: { ok: boolean; text: string }) => voi
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('rent');
   const [dueDay, setDueDay] = useState('1');
-  const [saving, setSaving] = useState(false);
+  const [saving, startTransition] = useTransition();
 
-  async function submit() {
-    setSaving(true);
-    const result = await addCommitment({ label, amount, category, dueDay: Number(dueDay) });
-    onDone({ ok: result.ok, text: result.ok ? result.message : result.error });
-    if (result.ok) {
-      setLabel('');
-      setAmount('');
-    }
-    setSaving(false);
+  function submit() {
+    startTransition(async () => {
+      const result = await addCommitment({ label, amount, category, dueDay: Number(dueDay) });
+      startTransition(() => {
+        onDone({ ok: result.ok, text: result.ok ? result.message : result.error });
+        if (result.ok) {
+          setLabel('');
+          setAmount('');
+        }
+      });
+    });
   }
 
   return (

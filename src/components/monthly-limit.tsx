@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Alert, Button, Field, inputClass, inputStyle } from '@/components/ui';
 import { formatRupees, parseAmountToPaise } from '@/lib/engines/money';
@@ -29,24 +29,26 @@ export function MonthlyLimit({
   const [value, setValue] = useState(
     currentPaise === null ? '' : String(Math.round(currentPaise / 100)),
   );
-  const [saving, setSaving] = useState(false);
   const [state, setState] = useState<MoneyResult | null>(null);
+  // A transition, so "Monthly amount set" appears with the ring already
+  // redrawn against it rather than beside the old figure.
+  const [saving, startTransition] = useTransition();
 
   const paise = parseAmountToPaise(value);
 
-  async function save() {
-    setSaving(true);
+  function submit(monthlyLimitPaise: number | null) {
     setState(null);
-    setState(await setMoneySettings({ monthlyLimitPaise: paise }));
-    setSaving(false);
+    startTransition(async () => {
+      const result = await setMoneySettings({ monthlyLimitPaise });
+      startTransition(() => setState(result));
+    });
   }
 
-  async function clear() {
-    setSaving(true);
-    setState(null);
+  const save = () => submit(paise);
+
+  function clear() {
     setValue('');
-    setState(await setMoneySettings({ monthlyLimitPaise: null }));
-    setSaving(false);
+    submit(null);
   }
 
   return (

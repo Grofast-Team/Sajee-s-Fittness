@@ -134,8 +134,12 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                             serving: { unitLabel: entry.unitLabel, count: amount },
                           },
                     );
-                    if (!result.ok) setError(result.error);
-                    else setEditing(null);
+                    // Wrapped again so the form closes with the new totals in
+                    // place, not a moment before them.
+                    startTransition(() => {
+                      if (!result.ok) setError(result.error);
+                      else setEditing(null);
+                    });
                   });
                 }}
               >
@@ -195,8 +199,10 @@ export function LoggedMeals({ items, canEdit }: { items: LoggedItem[]; canEdit: 
                   onClick={() =>
                     startTransition(async () => {
                       const result = await deleteFoodLog(entry.id);
-                      if (!result.ok) setError(result.error ?? 'We could not remove that entry.');
-                      setConfirming(null);
+                      startTransition(() => {
+                        if (!result.ok) setError(result.error ?? 'We could not remove that entry.');
+                        setConfirming(null);
+                      });
                     })
                   }
                 >

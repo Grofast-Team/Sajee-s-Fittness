@@ -43,9 +43,13 @@ export function QuickAdd({ items, canLog }: { items: RecentFood[]; canLog: boole
           : { serving: { unitLabel: item.unitLabel, count: item.quantity } }),
       });
 
-      if (result.ok) setDone(item.description);
-      else setError(result.error);
-      setPendingId(null);
+      // Wrapped again: state set after an await is outside the transition, so
+      // "Added" would otherwise show beside the day's old totals.
+      startTransition(() => {
+        if (result.ok) setDone(item.description);
+        else setError(result.error);
+        setPendingId(null);
+      });
     });
   }
 
