@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { TrendingUp } from 'lucide-react';
+import { FileUp, TrendingUp } from 'lucide-react';
 import { Panel, PageHeader, Ring, Section, Why } from '@/components/ui';
 import { SampleBanner } from '@/components/sample-banner';
 import { SpendEntry } from '@/components/spend-entry';
@@ -111,13 +111,22 @@ export default async function MoneyPage() {
         title="Money"
         lede={`${window.label} — ${window.daysLeft} day${window.daysLeft === 1 ? '' : 's'} left in this month.`}
         action={
-          <Link
-            href="/money/trends"
-            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium"
-            style={{ color: 'var(--primary-dark)' }}
-          >
-            <TrendingUp size={16} aria-hidden /> Trends over time
-          </Link>
+          <div className="flex flex-wrap gap-x-5">
+            <Link
+              href="/money/trends"
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium"
+              style={{ color: 'var(--primary-dark)' }}
+            >
+              <TrendingUp size={16} aria-hidden /> Trends over time
+            </Link>
+            <Link
+              href="/money/import"
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium"
+              style={{ color: 'var(--primary-dark)' }}
+            >
+              <FileUp size={16} aria-hidden /> Import a statement
+            </Link>
+          </div>
         }
       />
 
