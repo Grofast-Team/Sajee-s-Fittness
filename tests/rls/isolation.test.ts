@@ -995,6 +995,120 @@ suite('Row Level Security', () => {
     }, 60_000);
   });
 
+  // --- statement import ---------------------------------------------------
+
+  describe('statement imports keep to their owner', () => {
+    let aliceBatchId: string;
+    let bobSpendId: string;
+    let bobIncomeId: string;
+
+    beforeAll(async () => {
+      const [{ data: batch, error }, { data: spend }, { data: income }] = await Promise.all([
+        alice.client.from('import_batches').insert({ user_id: alice.id, file_name: 'alice.csv', row_count: 1 }).select('id').single(),
+        bob.client.from('spends').insert({ user_id: bob.id, amount_paise: 25_000, category: 'eating_out' }).select('id').single(),
+        bob.client.from('incomes').insert({ user_id: bob.id, amount_paise: 5_000_000 }).select('id').single(),
+      ]);
+      expect(error).toBeNull();
+      aliceBatchId = batch!.id as string;
+      bobSpendId = spend!.id as string;
+      bobIncomeId = income!.id as string;
+
+      const seeds = await Promise.all([
+        alice.client.from('import_rows').insert({
+          user_id: alice.id,
+          batch_id: aliceBatchId,
+          row_number: 5,
+          raw: ['01/09/2026', 'UPI/1/ALICE PHARMACY', '450.00'],
+          occurred_on: '2026-09-01',
+          description: 'UPI/1/ALICE PHARMACY',
+          amount_paise: 45_000,
+          direction: 'out',
+          merchant_key: 'alice pharmacy',
+          category: 'medical',
+          category_source: 'none',
+        }),
+        alice.client.from('merchant_rules').insert({ user_id: alice.id, merchant_key: 'alice pharmacy', category: 'medical' }),
+      ]);
+      for (const s of seeds) expect(s.error).toBeNull();
+    }, 60_000);
+
+    it('never shows Bob Alice’s statement lines or what she taught it', async () => {
+      for (const table of ['import_batches', 'import_rows', 'merchant_rules']) {
+        const { data, error } = await bob.client.from(table).select('user_id');
+        expect(error, `${table} errored`).toBeNull();
+        expect((data ?? []).filter((r: { user_id: string }) => r.user_id !== bob.id), `${table} leaked`).toHaveLength(0);
+      }
+    });
+
+    it('refuses a line added to another user’s batch', async () => {
+      const { error } = await bob.client.from('import_rows').insert({
+        user_id: bob.id,
+        batch_id: aliceBatchId,
+        row_number: 99,
+        raw: [],
+        status: 'unreadable',
+      });
+      expect(error?.code).toBe('42501');
+    });
+
+    it('refuses to link a line to another user’s spend or income', async () => {
+      const { data: row } = await alice.client
+        .from('import_rows')
+        .select('id')
+        .eq('batch_id', aliceBatchId)
+        .eq('row_number', 5)
+        .single();
+
+      for (const change of [{ spend_id: bobSpendId }, { duplicate_of_spend: bobSpendId }, { income_id: bobIncomeId }]) {
+        const { error } = await alice.client.from('import_rows').update(change).eq('id', row!.id);
+        expect(error?.code, JSON.stringify(change)).toBe('42501');
+      }
+    });
+
+    it('refuses a pending line with no amount', async () => {
+      const { error } = await alice.client.from('import_rows').insert({
+        user_id: alice.id,
+        batch_id: aliceBatchId,
+        row_number: 6,
+        raw: ['Opening balance'],
+        status: 'pending',
+      });
+      expect(error?.code).toBe('23514');
+    });
+
+    it('still deletes an account with an imported statement', async () => {
+      const doomed = await createTestUser('doomed-import');
+      const [{ data: batch }, { data: spend }] = await Promise.all([
+        doomed.client.from('import_batches').insert({ user_id: doomed.id, row_count: 1 }).select('id').single(),
+        doomed.client.from('spends').insert({ user_id: doomed.id, amount_paise: 1_000, category: 'groceries' }).select('id').single(),
+      ]);
+      // A recorded line points at its spend; deleting the account sets that
+      // link to null while the guard is watching.
+      const { error: rowError } = await doomed.client.from('import_rows').insert({
+        user_id: doomed.id,
+        batch_id: batch!.id,
+        row_number: 2,
+        raw: [],
+        occurred_on: '2026-09-01',
+        amount_paise: 1_000,
+        direction: 'out',
+        status: 'imported',
+        spend_id: spend!.id,
+        duplicate_of_spend: spend!.id,
+      });
+      expect(rowError).toBeNull();
+
+      const { error } = await adminClient().auth.admin.deleteUser(doomed.id);
+      expect(error, 'account deletion failed').toBeNull();
+
+      const admin = adminClient();
+      for (const table of ['import_batches', 'import_rows', 'merchant_rules', 'spends']) {
+        const { data } = await admin.from(table).select('user_id').eq('user_id', doomed.id);
+        expect(data ?? [], `${table} kept rows for a deleted user`).toHaveLength(0);
+      }
+    }, 60_000);
+  });
+
   // --- reference data -----------------------------------------------------
 
   describe('shared reference data', () => {

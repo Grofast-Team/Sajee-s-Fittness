@@ -191,4 +191,7 @@ export const OWNER_TABLES = [
   'savings_withdrawals',
   'pantry_items',
   'pantry_movements',
+  'import_batches',
+  'import_rows',
+  'merchant_rules',
 ] as const;

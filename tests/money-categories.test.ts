@@ -12,12 +12,14 @@ import { CATEGORIES, SPEND_CATEGORY_IDS } from '@/lib/engines/money';
  * If a later migration alters either constraint, point the matching test at
  * that migration instead.
  */
-function constraintCategories(migration: string): string[] {
+function allConstraintCategories(migration: string): string[][] {
   const sql = readFileSync(join(process.cwd(), 'supabase', 'migrations', migration), 'utf8');
-  const match = sql.match(/check\s*\(\s*category\s+in\s*\(([\s\S]*?)\)\s*\)/i);
-  if (!match) throw new Error(`No category check constraint found in ${migration}`);
-  return [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  const matches = [...sql.matchAll(/check\s*\(\s*category\s+in\s*\(([\s\S]*?)\)\s*\)/gi)];
+  if (matches.length === 0) throw new Error(`No category check constraint found in ${migration}`);
+  return matches.map((match) => [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]));
 }
+
+const constraintCategories = (migration: string) => allConstraintCategories(migration)[0];
 
 describe('spending categories have one definition', () => {
   it('exposes the ids in the same order as the labelled list', () => {
@@ -38,5 +40,11 @@ describe('spending categories have one definition', () => {
     expect(constraintCategories('20260903120010_commitments.sql').sort()).toEqual(
       [...SPEND_CATEGORY_IDS].sort(),
     );
+  });
+
+  it('matches both constraints in the statement import, on import rows and merchant rules', () => {
+    const lists = allConstraintCategories('20260903120018_bank_import.sql');
+    expect(lists).toHaveLength(2);
+    for (const list of lists) expect([...list].sort()).toEqual([...SPEND_CATEGORY_IDS].sort());
   });
 });
