@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
+import { allRows } from '@/lib/data/paged';
 import type { Commitment } from '@/lib/engines/commitments';
 import type { Intent } from '@/lib/engines/salary';
 import {
@@ -16,29 +17,6 @@ export interface MoneyTrendsView {
 }
 
 type Client = Awaited<ReturnType<typeof createClient>>;
-
-/** PostgREST returns at most 1,000 rows a request. */
-const PAGE = 1000;
-
-/**
- * Every row of a query, a page at a time.
- *
- * Seven months of someone recording bus fares passes a thousand spends, and a
- * silently truncated read would show the oldest months as quieter than they
- * were — a trend invented by a row limit.
- */
-async function all<T>(
-  query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await query(from, from + PAGE - 1);
-    if (error || !data) break;
-    rows.push(...data);
-    if (data.length < PAGE) break;
-  }
-  return rows;
-}
 
 /**
  * The last few money-months, for the trends screen.
@@ -65,8 +43,8 @@ export async function getMoneyTrends(): Promise<MoneyTrendsView> {
   const monthStartDay = settings?.month_start_day ?? 1;
   const from = trendsFrom(today, monthStartDay);
 
-  const [spends, incomes, withdrawalsRes, commitmentsRes, earlierSpend, earlierIncome] = await Promise.all([
-    all((lo, hi) =>
+  const [spendsRes, incomesRes, withdrawalsRes, commitmentsRes, earlierSpend, earlierIncome] = await Promise.all([
+    allRows((lo, hi) =>
       supabase
         .from('spends')
         .select('amount_paise, category, intent, spent_on')
@@ -76,7 +54,7 @@ export async function getMoneyTrends(): Promise<MoneyTrendsView> {
         .order('id', { ascending: true })
         .range(lo, hi),
     ),
-    all((lo, hi) =>
+    allRows((lo, hi) =>
       supabase
         .from('incomes')
         .select('amount_paise, received_on')
@@ -98,6 +76,9 @@ export async function getMoneyTrends(): Promise<MoneyTrendsView> {
     recordedBefore(supabase, 'spends', 'spent_on', userId, from),
     recordedBefore(supabase, 'incomes', 'received_on', userId, from),
   ]);
+
+  const spends = spendsRes.rows;
+  const incomes = incomesRes.rows;
 
   const input: TrendsInput = {
     // bigint arrives as a string from PostgREST.
