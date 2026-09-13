@@ -218,22 +218,34 @@ function GoalRow({
               onSubmit={(amount) => run(() => withdrawFromSavingsGoal({ id: goal.id, amount }))}
             />
           ) : mode === 'edit' ? (
-            <GoalForm
-              idPrefix={`goal-edit-${goal.id}`}
-              initial={{
-                label: goal.label,
-                target: asTyped(goal.targetPaise),
-                saved: goal.openingPaise > 0 ? asTyped(goal.openingPaise) : '',
-                targetDate: goal.targetDate ?? '',
-              }}
-              submitLabel="Save"
-              onCancel={() => setMode('idle')}
-              submit={(fields) => updateSavingsGoal({ id: goal.id, ...editFrom(goal, fields) })}
-              onDone={(result) => {
-                onNotice(toNotice(result));
-                if (result.ok) setMode('idle');
-              }}
-            />
+            <>
+              <GoalForm
+                idPrefix={`goal-edit-${goal.id}`}
+                initial={{
+                  label: goal.label,
+                  target: asTyped(goal.targetPaise),
+                  saved: goal.openingPaise > 0 ? asTyped(goal.openingPaise) : '',
+                  targetDate: goal.targetDate ?? '',
+                }}
+                submitLabel="Save"
+                onCancel={() => setMode('idle')}
+                submit={(fields) => updateSavingsGoal({ id: goal.id, ...editFrom(goal, fields) })}
+                onDone={(result) => {
+                  onNotice(toNotice(result));
+                  if (result.ok) setMode('idle');
+                }}
+              />
+              {/* Here rather than beside Add money: it is rare and final, and a
+                  fourth button in the row wrapped onto its own line on a phone. */}
+              <Button
+                className="mt-2"
+                variant="quiet"
+                aria-label={`Close ${goal.label}`}
+                onClick={() => setMode('close')}
+              >
+                Close this goal…
+              </Button>
+            </>
           ) : mode === 'close' ? (
             <div
               className="mt-2.5 flex flex-wrap items-center gap-2 p-3"
@@ -265,9 +277,6 @@ function GoalRow({
               ) : null}
               <Button variant="quiet" aria-label={`Edit ${goal.label}`} onClick={() => open('edit')}>
                 Edit
-              </Button>
-              <Button variant="quiet" aria-label={`Close ${goal.label}`} onClick={() => open('close')}>
-                Close
               </Button>
             </div>
           )}
