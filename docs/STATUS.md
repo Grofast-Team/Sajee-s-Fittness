@@ -130,7 +130,7 @@ Live verification performed:
 | Recurring commitments — rent, bills, EMI, subscriptions | **Done** — `commitments` holds the plan; settling one writes an ordinary `spends` row carrying `commitment_id`, so there is one ledger and "is the rent paid" is answered from it. Turns the screen from "what has gone out" into "what is genuinely free" |
 | Income and "where did my salary go?" | **Done** — `income_sources` (the plan) and `incomes` (the ledger), so salary history is kept rather than overwritten. Spending is broken down by what it was for — already spoken for, needs, wants, set aside — and the last line is "not accounted for", never "remaining", because without a bank balance money still in the account and money spent but not recorded cannot be told apart |
 | Need / want classification | **Done** — defaults only for categories where the answer is not in doubt; clothes, gifts, education and similar stay unclassified until the user says, and the wants figure is reported as a floor until they do |
-| Editing a recorded spend | **Not built** — same gap food logging had until `f7f07a6`: you can add and delete but not correct |
+| Editing and removing a recorded spend | **Done** — inline in the Recent list. Until this shipped a spend could only be added: `deleteSpend` existed but nothing called it. Edits cannot change ownership or the bill a payment settled (rejected by a strict schema, then again by triggers), a bill payment keeps its bill's category, an edit that leaves a bill unpaid says so before it happens, and every change and removal is kept in append-only `spend_revisions` |
 
 Two rules the food estimate is built on, both worth keeping:
 

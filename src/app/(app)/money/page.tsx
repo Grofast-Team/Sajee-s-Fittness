@@ -9,7 +9,8 @@ import { getMoneyMonth } from '@/lib/data/money';
 import { getFoodSpend } from '@/lib/data/food-spend';
 import { getCommitments } from '@/lib/data/commitments';
 import { getSalaryView } from '@/lib/data/salary';
-import { CATEGORIES, categoryLabel, formatRupees, type CategoryTotal } from '@/lib/engines/money';
+import { CATEGORIES, formatRupees, type CategoryTotal } from '@/lib/engines/money';
+import { SpendList } from '@/components/spend-list';
 
 /**
  * One category's share of the month.
@@ -233,43 +234,7 @@ export default async function MoneyPage() {
               title="Recent"
               meta={view.recent.length > 0 ? `${view.recent.length} this month` : undefined}
             >
-              {view.recent.length > 0 ? (
-                <ul>
-                  {view.recent.slice(0, 25).map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex items-baseline justify-between gap-3 border-b py-2.5 first:pt-0 last:border-0 last:pb-0"
-                      style={{ borderColor: 'var(--line)' }}
-                    >
-                      <div className="min-w-0">
-                        <span className="text-sm">
-                          {EMOJI.get(s.category as never) ?? '•'} {categoryLabel(s.category)}
-                        </span>
-                        {s.note ? (
-                          <span className="ml-2 text-[13px]" style={{ color: 'var(--fg-subtle)' }}>
-                            {s.note}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <span className="data text-sm font-semibold">
-                          {formatRupees(s.amountPaise)}
-                        </span>
-                        <span
-                          className="data ml-2 text-[12px]"
-                          style={{ color: 'var(--fg-subtle)' }}
-                        >
-                          {s.spentOn.slice(8)}/{s.spentOn.slice(5, 7)}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-                  Nothing recorded yet.
-                </p>
-              )}
+              <SpendList spends={view.recent.slice(0, 25)} canEdit={!view.isSample} />
             </Section>
           </Panel>
         </div>
