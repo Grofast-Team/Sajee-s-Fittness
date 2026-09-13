@@ -351,6 +351,228 @@ suite('Row Level Security', () => {
     });
   });
 
+  describe('money edits are guarded and remembered', () => {
+    let aliceCommitmentId: string;
+    let aliceSourceId: string;
+
+    beforeAll(async () => {
+      const [{ data: commitment }, { data: source }] = await Promise.all([
+        alice.client
+          .from('commitments')
+          .insert({
+            user_id: alice.id,
+            label: 'alice internet',
+            amount_paise: 89_900,
+            category: 'phone_internet',
+          })
+          .select('id')
+          .single(),
+        alice.client
+          .from('income_sources')
+          .insert({ user_id: alice.id, label: 'alice freelance', kind: 'freelance' })
+          .select('id')
+          .single(),
+      ]);
+      aliceCommitmentId = commitment!.id as string;
+      aliceSourceId = source!.id as string;
+    }, 60_000);
+
+    // Found 2026-09-13. Foreign-key checks run with the table owner's rights
+    // and ignore RLS, so both inserts were accepted even though Bob could not
+    // read either row.
+    it('refuses a spend that settles another user’s commitment', async () => {
+      const { error } = await bob.client.from('spends').insert({
+        user_id: bob.id,
+        amount_paise: 100,
+        category: 'phone_internet',
+        commitment_id: aliceCommitmentId,
+      });
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    });
+
+    it('refuses income attributed to another user’s income source', async () => {
+      const { error } = await bob.client.from('incomes').insert({
+        user_id: bob.id,
+        amount_paise: 100,
+        source_id: aliceSourceId,
+      });
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('42501');
+    });
+
+    it('still lets Alice settle her own commitment', async () => {
+      const { error } = await alice.client.from('spends').insert({
+        user_id: alice.id,
+        amount_paise: 89_900,
+        category: 'phone_internet',
+        commitment_id: aliceCommitmentId,
+      });
+      expect(error).toBeNull();
+    });
+
+    it('will not recategorise a payment that settled a commitment', async () => {
+      const { data: payment } = await alice.client
+        .from('spends')
+        .insert({
+          user_id: alice.id,
+          amount_paise: 89_900,
+          category: 'phone_internet',
+          commitment_id: aliceCommitmentId,
+        })
+        .select('id')
+        .single();
+
+      const { error } = await alice.client
+        .from('spends')
+        .update({ category: 'groceries' })
+        .eq('id', payment!.id);
+      expect(error).not.toBeNull();
+      expect(error!.code).toBe('23514');
+    });
+
+    it('stamps updated_at on an edit', async () => {
+      const { data: spend } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 500, category: 'other' })
+        .select('id')
+        .single();
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const { data: after } = await alice.client
+        .from('spends')
+        .update({ amount_paise: 600 })
+        .eq('id', spend!.id)
+        .select('created_at, updated_at')
+        .single();
+
+      expect(new Date(after!.updated_at as string).getTime()).toBeGreaterThan(
+        new Date(after!.created_at as string).getTime(),
+      );
+    });
+
+    it('records what a spend looked like before it was edited', async () => {
+      const { data: spend } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 25_000, category: 'clothes', note: 'before' })
+        .select('id')
+        .single();
+
+      await alice.client
+        .from('spends')
+        .update({ amount_paise: 30_000, note: 'after' })
+        .eq('id', spend!.id);
+
+      const { data: revisions, error } = await alice.client
+        .from('spend_revisions')
+        .select('action, before, changed_fields')
+        .eq('spend_id', spend!.id);
+
+      expect(error).toBeNull();
+      expect(revisions).toHaveLength(1);
+      expect(revisions![0].action).toBe('update');
+      const before = revisions![0].before as { amount_paise: number; note: string };
+      expect(Number(before.amount_paise)).toBe(25_000);
+      expect(before.note).toBe('before');
+      expect([...(revisions![0].changed_fields as string[])].sort()).toEqual([
+        'amount_paise',
+        'note',
+      ]);
+    });
+
+    it('does not record an edit that changed nothing', async () => {
+      const { data: spend } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 700, category: 'other' })
+        .select('id')
+        .single();
+
+      await alice.client.from('spends').update({ amount_paise: 700 }).eq('id', spend!.id);
+
+      const { data: revisions } = await alice.client
+        .from('spend_revisions')
+        .select('id')
+        .eq('spend_id', spend!.id);
+      expect(revisions ?? []).toHaveLength(0);
+    });
+
+    it('keeps a removed spend in the history', async () => {
+      const { data: spend } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 1_500, category: 'gifts' })
+        .select('id')
+        .single();
+
+      await alice.client.from('spends').delete().eq('id', spend!.id);
+
+      const { data: revisions } = await alice.client
+        .from('spend_revisions')
+        .select('action, before')
+        .eq('spend_id', spend!.id);
+      expect(revisions).toHaveLength(1);
+      expect(revisions![0].action).toBe('delete');
+      expect(Number((revisions![0].before as { amount_paise: number }).amount_paise)).toBe(1_500);
+    });
+
+    it('never shows Bob Alice’s history', async () => {
+      const { data: exists } = await adminClient()
+        .from('spend_revisions')
+        .select('id')
+        .eq('user_id', alice.id);
+      expect((exists ?? []).length, 'Alice needs history for this to mean anything').toBeGreaterThan(0);
+
+      const { data } = await bob.client.from('spend_revisions').select('user_id');
+      const foreign = (data ?? []).filter((r: { user_id: string }) => r.user_id !== bob.id);
+      expect(foreign).toHaveLength(0);
+    });
+
+    it('does not let Alice rewrite or erase her own history', async () => {
+      const { data: spend } = await alice.client
+        .from('spends')
+        .insert({ user_id: alice.id, amount_paise: 900, category: 'other' })
+        .select('id')
+        .single();
+      await alice.client.from('spends').update({ amount_paise: 950 }).eq('id', spend!.id);
+
+      const { data: edited } = await alice.client
+        .from('spend_revisions')
+        .update({ changed_fields: [] })
+        .eq('spend_id', spend!.id)
+        .select();
+      expect(edited ?? []).toHaveLength(0);
+
+      await alice.client.from('spend_revisions').delete().eq('spend_id', spend!.id);
+
+      const { data: kept } = await adminClient()
+        .from('spend_revisions')
+        .select('id')
+        .eq('spend_id', spend!.id);
+      expect(kept ?? []).toHaveLength(1);
+    });
+
+    // The trap from 20260829100014: a trigger that writes a row for a user who
+    // is being deleted fails the foreign key and aborts the whole deletion.
+    it('still deletes an account whose spends have history', async () => {
+      const doomed = await createTestUser('doomed-money');
+      const { data: spend } = await doomed.client
+        .from('spends')
+        .insert({ user_id: doomed.id, amount_paise: 1_000, category: 'other' })
+        .select('id')
+        .single();
+      await doomed.client.from('spends').update({ amount_paise: 1_100 }).eq('id', spend!.id);
+
+      const { error } = await adminClient().auth.admin.deleteUser(doomed.id);
+      expect(error, 'account deletion failed').toBeNull();
+
+      const admin = adminClient();
+      for (const table of ['spends', 'spend_revisions']) {
+        const { data } = await admin.from(table).select('user_id').eq('user_id', doomed.id);
+        expect(data ?? [], `${table} kept rows for a deleted user`).toHaveLength(0);
+      }
+    }, 60_000);
+  });
+
   // --- reference data -----------------------------------------------------
 
   describe('shared reference data', () => {
