@@ -5,10 +5,12 @@ import { MonthlyLimit } from '@/components/monthly-limit';
 import { FoodSpendPanel } from '@/components/food-spend-panel';
 import { CommitmentsPanel } from '@/components/commitments-panel';
 import { SalaryPanel } from '@/components/salary-panel';
+import { SavingsPanel } from '@/components/savings-panel';
 import { getMoneyMonth } from '@/lib/data/money';
 import { getFoodSpend } from '@/lib/data/food-spend';
 import { getCommitments } from '@/lib/data/commitments';
 import { getSalaryView } from '@/lib/data/salary';
+import { getSavingsGoals } from '@/lib/data/savings';
 import { CATEGORIES, formatRupees, type CategoryTotal } from '@/lib/engines/money';
 import { SpendList } from '@/components/spend-list';
 
@@ -77,7 +79,7 @@ export default async function MoneyPage() {
    * month look under budget until the last day of it.
    */
   const todayIso = new Date().toISOString().slice(0, 10);
-  const [foodSpend, commitments, salary] = await Promise.all([
+  const [foodSpend, commitments, salary, savings] = await Promise.all([
     getFoodSpend(window.start, todayIso),
     /*
      * `summary.totalPaise` already includes any commitment settled this month,
@@ -92,6 +94,7 @@ export default async function MoneyPage() {
       window.daysLeft,
     ),
     getSalaryView(window.start, window.end),
+    getSavingsGoals(),
   ]);
 
   const spent = summary.totalPaise;
@@ -199,6 +202,14 @@ export default async function MoneyPage() {
           {salary ? (
             <Panel>
               <SalaryPanel view={salary} canEdit={!view.isSample} />
+            </Panel>
+          ) : null}
+
+          {/* Beside the salary breakdown, which already counts what went into
+              these as set aside. */}
+          {savings ? (
+            <Panel>
+              <SavingsPanel goals={savings} canEdit={!view.isSample} />
             </Panel>
           ) : null}
 
