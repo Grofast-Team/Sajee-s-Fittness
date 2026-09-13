@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
 import { formatRupees, monthWindow, SPEND_CATEGORY_IDS, type SpendCategory } from '@/lib/engines/money';
+import { insertSpends, spendInputSchema } from '@/lib/spends/record';
 import {
   planSpendEdit,
   type ExistingSpend,
@@ -24,24 +25,12 @@ export type MoneyResult =
   | { ok: true; message: string; warning?: string | null }
   | { ok: false; error: string };
 
-const spendSchema = z.object({
-  // Integer paise. `.int()` is the guard that stops a stray decimal becoming
-  // a permanent rounding error in every total that follows.
-  amountPaise: z.number().int().positive().max(100_000_000_000),
-  category: z.enum(SPEND_CATEGORY_IDS),
-  note: z.string().trim().max(200).optional(),
-  spentOn: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-});
-
 export async function logSpend(input: unknown): Promise<MoneyResult> {
   if (!supabaseConfigured) {
     return { ok: false, error: 'Supabase is not configured on this deployment.' };
   }
 
-  const parsed = spendSchema.safeParse(input);
+  const parsed = spendInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'We could not read that amount.' };
   const s = parsed.data;
 
@@ -49,18 +38,9 @@ export async function logSpend(input: unknown): Promise<MoneyResult> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in.' };
 
-  const { error } = await supabase.from('spends').insert({
-    user_id: auth.user.id,
-    amount_paise: s.amountPaise,
-    category: s.category,
-    note: s.note || null,
-    spent_on: s.spentOn ?? new Date().toISOString().slice(0, 10),
-  });
-
-  if (error) {
-    console.error('spend insert failed', error);
-    return { ok: false, error: "We couldn't save that. Please try again." };
-  }
+  // The same path a confirmed statement import writes through.
+  const result = await insertSpends(supabase, auth.user.id, [s]);
+  if (!result.ok) return { ok: false, error: result.error };
 
   revalidatePath('/money');
   revalidatePath('/today');
