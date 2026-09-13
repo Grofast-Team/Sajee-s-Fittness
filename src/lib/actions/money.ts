@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
-import { formatRupees } from '@/lib/engines/money';
+import { formatRupees, SPEND_CATEGORY_IDS } from '@/lib/engines/money';
 
 /**
  * Recording money.
@@ -16,30 +16,11 @@ import { formatRupees } from '@/lib/engines/money';
 
 export type MoneyResult = { ok: true; message: string } | { ok: false; error: string };
 
-const CATEGORIES = [
-  'groceries',
-  'eating_out',
-  'transport',
-  'rent',
-  'bills',
-  'phone_internet',
-  'medical',
-  'education',
-  'family',
-  'clothes',
-  'household',
-  'entertainment',
-  'personal_care',
-  'gifts',
-  'savings',
-  'other',
-] as const;
-
 const spendSchema = z.object({
   // Integer paise. `.int()` is the guard that stops a stray decimal becoming
   // a permanent rounding error in every total that follows.
   amountPaise: z.number().int().positive().max(100_000_000_000),
-  category: z.enum(CATEGORIES),
+  category: z.enum(SPEND_CATEGORY_IDS),
   note: z.string().trim().max(200).optional(),
   spentOn: z
     .string()

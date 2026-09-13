@@ -57,6 +57,18 @@ export const CATEGORIES: { id: SpendCategory; label: string; emoji: string }[] =
   { id: 'other', label: 'Other', emoji: '•' },
 ];
 
+/**
+ * The category ids as a non-empty tuple, which is the shape `z.enum` needs.
+ *
+ * This is the one list the others are checked against:
+ * `tests/money-categories.test.ts` fails if either database constraint drifts
+ * from it.
+ */
+export const SPEND_CATEGORY_IDS = CATEGORIES.map((c) => c.id) as [
+  SpendCategory,
+  ...SpendCategory[],
+];
+
 const LABELS = new Map(CATEGORIES.map((c) => [c.id, c.label]));
 
 export function categoryLabel(id: string): string {
