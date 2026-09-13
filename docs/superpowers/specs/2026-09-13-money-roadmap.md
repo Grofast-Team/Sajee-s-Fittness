@@ -1,7 +1,8 @@
 # Money roadmap: from recording to understanding
 
-**Status:** Sequencing agreed 2026-09-13. Feature 1 has a full implementation
-plan; each later feature gets its own when its predecessor ships.
+**Status:** Sequencing agreed 2026-09-13. Feature 1 shipped the same day
+(`8697fd8`); Feature 2 has a full implementation plan. Each later feature gets
+its own when its predecessor ships.
 
 **Read first:** `docs/ARCHITECTURE.md` §8 records what was deliberately *not*
 adopted from the "Life OS" proposal (Prisma, a duplicated `events` table, a
@@ -147,6 +148,8 @@ category source (`SPEND_CATEGORY_IDS`), an exported `PAID_THRESHOLD`, and money
 tables that are actually covered by the isolation suite.
 
 ### Feature 2 — Savings goals
+
+**Plan:** `docs/superpowers/plans/2026-09-13-savings-goals.md` (written after Feature 1 shipped in `8697fd8`).
 
 **Depends on 1** because a contribution is a spend. It is not a separate ledger:
 contributing to a goal records a `spends` row with `category = 'savings'` and a
