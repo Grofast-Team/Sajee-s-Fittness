@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
 import { allRows } from '@/lib/data/paged';
 import type { SpendCategory } from '@/lib/engines/money';
+import type { LineKind } from '@/lib/engines/bank-import';
 
 export interface BatchSummary {
   id: string;
@@ -27,14 +28,32 @@ export interface ReviewRow {
   merchantKey: string;
   category: SpendCategory | null;
   categorySource: 'rule' | 'keyword' | 'none' | 'person' | null;
+  kind: LineKind | null;
+  kindSource: 'rule' | 'keyword' | 'pair' | 'none' | 'person' | null;
+  /** Why it was read as this kind, when a pattern or a pairing decided. */
+  kindReason: string | null;
+  savingsGoalId: string | null;
+  incomeSourceId: string | null;
   duplicateOfSpend: { id: string; spentOn: string; amountPaise: number; category: string; note: string | null } | null;
+  duplicateOfIncome: { id: string; receivedOn: string; amountPaise: number; note: string | null } | null;
   duplicateOfRow: number | null;
+  /** The other leg of a transfer, in this file or an earlier import. */
+  pairRowNumber: number | null;
+  pairRowId: string | null;
   status: 'pending' | 'imported' | 'skipped' | 'unreadable';
 }
 
 export type ReviewView =
   | { state: 'missing' }
-  | { state: 'ready'; batch: BatchSummary; rows: ReviewRow[] };
+  | {
+      state: 'ready';
+      batch: BatchSummary;
+      rows: ReviewRow[];
+      /** Open goals a saving can go to. */
+      goals: { id: string; label: string }[];
+      /** Where income can be filed. */
+      sources: { id: string; label: string }[];
+    };
 
 async function session() {
   if (!supabaseConfigured) return null;
@@ -112,7 +131,7 @@ export async function getImportReview(batchId: string): Promise<ReviewView> {
     s.supabase
       .from('import_rows')
       .select(
-        'id, row_number, occurred_on, description, amount_paise, direction, problem, merchant_key, category, category_source, duplicate_of_spend, duplicate_of_row, status',
+        'id, row_number, occurred_on, description, amount_paise, direction, problem, merchant_key, category, category_source, kind, kind_source, kind_reason, savings_goal_id, income_source_id, duplicate_of_spend, duplicate_of_income, duplicate_of_row, pair_row_id, pair_row_number, status',
       )
       .eq('batch_id', batchId)
       .eq('user_id', s.userId)
@@ -131,10 +150,31 @@ export async function getImportReview(batchId: string): Promise<ReviewView> {
       : { data: [] };
   const spendById = new Map((spends ?? []).map((sp) => [sp.id as string, sp]));
 
+  const incomeIds = [...new Set(rows.map((r) => r.duplicate_of_income as string | null).filter((id): id is string => !!id))];
+  const [incomesRes, goalsRes, sourcesRes] = await Promise.all([
+    incomeIds.length > 0
+      ? s.supabase.from('incomes').select('id, received_on, amount_paise, note').eq('user_id', s.userId).in('id', incomeIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    s.supabase
+      .from('savings_goals')
+      .select('id, label')
+      .eq('user_id', s.userId)
+      .is('closed_on', null)
+      .order('created_at', { ascending: true }),
+    s.supabase
+      .from('income_sources')
+      .select('id, label')
+      .eq('user_id', s.userId)
+      .is('ended_on', null)
+      .order('created_at', { ascending: true }),
+  ]);
+  const incomeById = new Map((incomesRes.data ?? []).map((i) => [i.id as string, i]));
+
   const counts = emptyCounts();
   const review: ReviewRow[] = rows.map((r) => {
     counts[r.status as keyof typeof counts] += 1;
     const dup = r.duplicate_of_spend ? spendById.get(r.duplicate_of_spend as string) : undefined;
+    const dupIncome = r.duplicate_of_income ? incomeById.get(r.duplicate_of_income as string) : undefined;
     return {
       id: r.id as string,
       rowNumber: Number(r.row_number),
@@ -147,6 +187,21 @@ export async function getImportReview(batchId: string): Promise<ReviewView> {
       merchantKey: (r.merchant_key as string) ?? 'unknown',
       category: (r.category as SpendCategory) ?? null,
       categorySource: (r.category_source as ReviewRow['categorySource']) ?? null,
+      kind: (r.kind as LineKind) ?? null,
+      kindSource: (r.kind_source as ReviewRow['kindSource']) ?? null,
+      kindReason: (r.kind_reason as string) ?? null,
+      savingsGoalId: (r.savings_goal_id as string) ?? null,
+      incomeSourceId: (r.income_source_id as string) ?? null,
+      duplicateOfIncome: dupIncome
+        ? {
+            id: dupIncome.id as string,
+            receivedOn: dupIncome.received_on as string,
+            amountPaise: Number(dupIncome.amount_paise),
+            note: (dupIncome.note as string) ?? null,
+          }
+        : null,
+      pairRowNumber: r.pair_row_number == null ? null : Number(r.pair_row_number),
+      pairRowId: (r.pair_row_id as string) ?? null,
       duplicateOfSpend: dup
         ? {
             id: dup.id as string,
@@ -171,5 +226,7 @@ export async function getImportReview(batchId: string): Promise<ReviewView> {
       counts,
     },
     rows: review,
+    goals: (goalsRes.data ?? []).map((g) => ({ id: g.id as string, label: g.label as string })),
+    sources: (sourcesRes.data ?? []).map((src) => ({ id: src.id as string, label: src.label as string })),
   };
 }

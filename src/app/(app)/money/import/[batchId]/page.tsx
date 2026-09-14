@@ -12,7 +12,7 @@ export default async function ImportReviewPage({ params }: { params: Promise<{ b
   const review = await getImportReview(batchId);
   if (review.state === 'missing') notFound();
 
-  const { batch, rows } = review;
+  const { batch, rows, goals, sources } = review;
 
   return (
     <>
@@ -31,7 +31,13 @@ export default async function ImportReviewPage({ params }: { params: Promise<{ b
       />
 
       <Panel>
-        <ImportReview batchId={batch.id} rows={rows} confirmed={batch.confirmedAt !== null} />
+        <ImportReview
+          batchId={batch.id}
+          rows={rows}
+          confirmed={batch.confirmedAt !== null}
+          goals={goals}
+          sources={sources}
+        />
       </Panel>
     </>
   );

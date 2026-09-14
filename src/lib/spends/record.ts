@@ -35,17 +35,29 @@ const CHUNK = 500;
  * Validate and insert spends. Ids are chosen here, so a caller can link each
  * spend back to where it came from without relying on the order rows return.
  * All-or-nothing validation: one invalid input and nothing is written.
+ *
+ * `savingsGoalId` is deliberately not in `spendInputSchema`: that schema reads
+ * what a browser sends to "Add a spend", which has no business naming a goal.
+ * Server code that has already chosen a goal passes it here, and it is only
+ * accepted on a spend filed as savings. The database checks both again.
  */
 export async function insertSpends(
   supabase: Client,
   userId: string,
-  inputs: SpendInput[],
+  inputs: (SpendInput & { savingsGoalId?: string | null })[],
 ): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
   const parsed = inputs.map((input) => spendInputSchema.safeParse(input));
   if (parsed.some((p) => !p.success)) return { ok: false, error: 'We could not read that amount.' };
 
+  const goalOk = inputs.every(
+    (input) =>
+      !input.savingsGoalId ||
+      (input.category === 'savings' && z.string().uuid().safeParse(input.savingsGoalId).success),
+  );
+  if (!goalOk) return { ok: false, error: 'Money added to a goal has to be filed as savings.' };
+
   const today = new Date().toISOString().slice(0, 10);
-  const rows = parsed.map((p) => {
+  const rows = parsed.map((p, i) => {
     const s = p.data!;
     return {
       id: crypto.randomUUID(),
@@ -54,6 +66,7 @@ export async function insertSpends(
       category: s.category,
       note: s.note || null,
       spent_on: s.spentOn ?? today,
+      savings_goal_id: inputs[i].savingsGoalId ?? null,
     };
   });
 

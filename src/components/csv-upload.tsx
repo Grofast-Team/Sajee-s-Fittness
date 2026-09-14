@@ -229,8 +229,11 @@ export function CsvUpload({ canImport }: { canImport: boolean }) {
           <Button fullWidth disabled={staging || !canImport || readable.length === 0} onClick={stage}>
             {staging ? (
               <>
-                <Loader2 size={16} className="animate-spin" aria-hidden /> Checking {preview.length} lines…
+                <Loader2 size={16} className="animate-spin" aria-hidden /> Checking {preview.length} line
+                {preview.length === 1 ? '' : 's'}…
               </>
+            ) : preview.length === 1 ? (
+              'Check this 1 line'
             ) : (
               `Check these ${preview.length} lines`
             )}
