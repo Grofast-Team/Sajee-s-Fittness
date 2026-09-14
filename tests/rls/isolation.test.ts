@@ -1065,6 +1065,68 @@ suite('Row Level Security', () => {
       }
     });
 
+    it('refuses to file a line to another user’s goal, source, withdrawal, income or line', async () => {
+      const [{ data: bobGoal }, { data: bobSource }] = await Promise.all([
+        bob.client.from('savings_goals').insert({ user_id: bob.id, label: 'bob fund', target_paise: 1_000_000, opening_paise: 100_000 }).select('id').single(),
+        bob.client.from('income_sources').insert({ user_id: bob.id, label: 'bob salary' }).select('id').single(),
+      ]);
+      const { data: bobWithdrawal } = await bob.client
+        .from('savings_withdrawals')
+        .insert({ user_id: bob.id, savings_goal_id: bobGoal!.id, amount_paise: 1_000 })
+        .select('id')
+        .single();
+      const { data: bobBatch } = await bob.client.from('import_batches').insert({ user_id: bob.id, row_count: 1 }).select('id').single();
+      const { data: bobLine } = await bob.client
+        .from('import_rows')
+        .insert({ user_id: bob.id, batch_id: bobBatch!.id, row_number: 2, raw: [], status: 'unreadable' })
+        .select('id')
+        .single();
+
+      const { data: row } = await alice.client.from('import_rows').select('id').eq('batch_id', aliceBatchId).eq('row_number', 5).single();
+
+      for (const change of [
+        { savings_goal_id: bobGoal!.id },
+        { income_source_id: bobSource!.id },
+        { withdrawal_id: bobWithdrawal!.id },
+        { duplicate_of_income: bobIncomeId },
+        { pair_row_id: bobLine!.id },
+      ]) {
+        const { error } = await alice.client.from('import_rows').update(change).eq('id', row!.id);
+        expect(error?.code, JSON.stringify(change)).toBe('42501');
+      }
+
+      const { error: ruleError } = await alice.client
+        .from('merchant_rules')
+        .insert({ user_id: alice.id, merchant_key: 'bob fund sip', direction: 'out', kind: 'saving', savings_goal_id: bobGoal!.id });
+      expect(ruleError?.code).toBe('42501');
+    }, 60_000);
+
+    it('refuses a kind that does not fit the way the money moved, and spending with no category', async () => {
+      const { error: kindError } = await alice.client.from('import_rows').insert({
+        user_id: alice.id,
+        batch_id: aliceBatchId,
+        row_number: 7,
+        raw: [],
+        occurred_on: '2026-09-02',
+        amount_paise: 1_000,
+        direction: 'out',
+        kind: 'income',
+      });
+      expect(kindError?.code).toBe('23514');
+
+      const { error: ruleError } = await alice.client
+        .from('merchant_rules')
+        .insert({ user_id: alice.id, merchant_key: 'no category', direction: 'out', kind: 'expense' });
+      expect(ruleError?.code).toBe('23514');
+
+      // The same merchant can be taught one thing going out and another coming in.
+      const both = await Promise.all([
+        alice.client.from('merchant_rules').insert({ user_id: alice.id, merchant_key: 'two ways', direction: 'out', kind: 'expense', category: 'clothes' }),
+        alice.client.from('merchant_rules').insert({ user_id: alice.id, merchant_key: 'two ways', direction: 'in', kind: 'refund' }),
+      ]);
+      for (const b of both) expect(b.error).toBeNull();
+    });
+
     it('refuses a pending line with no amount', async () => {
       const { error } = await alice.client.from('import_rows').insert({
         user_id: alice.id,
@@ -1084,6 +1146,11 @@ suite('Row Level Security', () => {
       ]);
       // A recorded line points at its spend; deleting the account sets that
       // link to null while the guard is watching.
+      const { data: goal } = await doomed.client
+        .from('savings_goals')
+        .insert({ user_id: doomed.id, label: 'doomed goal', target_paise: 1_000_000 })
+        .select('id')
+        .single();
       const { error: rowError } = await doomed.client.from('import_rows').insert({
         user_id: doomed.id,
         batch_id: batch!.id,
@@ -1092,11 +1159,18 @@ suite('Row Level Security', () => {
         occurred_on: '2026-09-01',
         amount_paise: 1_000,
         direction: 'out',
+        kind: 'saving',
+        savings_goal_id: goal!.id,
         status: 'imported',
         spend_id: spend!.id,
         duplicate_of_spend: spend!.id,
       });
       expect(rowError).toBeNull();
+      // Deleting the account unlinks the goal from both of these mid-deletion.
+      const { error: ruleError } = await doomed.client
+        .from('merchant_rules')
+        .insert({ user_id: doomed.id, merchant_key: 'doomed sip', direction: 'out', kind: 'saving', savings_goal_id: goal!.id });
+      expect(ruleError).toBeNull();
 
       const { error } = await adminClient().auth.admin.deleteUser(doomed.id);
       expect(error, 'account deletion failed').toBeNull();

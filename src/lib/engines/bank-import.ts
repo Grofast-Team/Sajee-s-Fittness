@@ -466,9 +466,26 @@ export function merchantKey(description: string): string {
   return words.slice(0, 2).join(' ') || 'unknown';
 }
 
+export type LineKind = 'expense' | 'income' | 'transfer' | 'saving' | 'refund';
+
+/** What a line can be, by which way the money moved. */
+export const KINDS_FOR: Record<'in' | 'out', LineKind[]> = {
+  out: ['expense', 'saving', 'transfer'],
+  in: ['income', 'transfer', 'saving', 'refund'],
+};
+
+/**
+ * What the person taught it for one merchant, one direction at a time: Amazon
+ * out is shopping, Amazon in is a refund, and one rule cannot say both.
+ */
 export interface MerchantRule {
   merchantKey: string;
-  category: SpendCategory;
+  direction?: 'in' | 'out';
+  kind?: LineKind;
+  /** For spending only. */
+  category: SpendCategory | null;
+  savingsGoalId?: string | null;
+  incomeSourceId?: string | null;
 }
 
 export type Suggestion =
@@ -477,13 +494,187 @@ export type Suggestion =
 
 /** What the person taught it first, then merchants whose category is not in doubt. Otherwise nothing. */
 export function suggestCategory(key: string, rules: MerchantRule[]): Suggestion {
-  const rule = rules.find((r) => r.merchantKey === key);
-  if (rule) return { category: rule.category, source: 'rule' };
+  const rule = rules.find(
+    (r) =>
+      r.merchantKey === key &&
+      (r.direction ?? 'out') === 'out' &&
+      (r.kind ?? 'expense') === 'expense' &&
+      r.category !== null,
+  );
+  if (rule && rule.category) return { category: rule.category, source: 'rule' };
 
   const known = MERCHANTS.find(([name]) => name === key);
   if (known && known[1]) return { category: known[1], source: 'keyword' };
 
   return { category: null, source: 'none' };
+}
+
+/* ------------------------------------------------------------------ */
+/* What a line is                                                      */
+/* ------------------------------------------------------------------ */
+
+export interface Classification {
+  kind: LineKind;
+  category: SpendCategory | null;
+  savingsGoalId: string | null;
+  incomeSourceId: string | null;
+  source: 'rule' | 'keyword' | 'none';
+  /** Why, in words, when a pattern decided. */
+  reason: string | null;
+}
+
+/*
+ * Patterns only where the answer is not in doubt, checked against the narration
+ * with punctuation turned to spaces.
+ */
+const CARD_BILL =
+  /\b(credit card|cc payment|cc bill|card bill|card autopay|autopay card|cred club|cred|sbi card|card payment)\b/;
+const OWN_TRANSFER = /\b(self|to self|by self|own account|own a c|own acct|sweep in|sweep out|internal transfer)\b/;
+const SAVING_OUT =
+  /\b(sip|mutual fund|mf purchase|rd installment|rd instalment|recurring deposit|fixed deposit|fd booking|ppf|nps|elss|smallcase|kuvera|indmoney|zerodha|groww)\b/;
+const SAVING_IN = /\b(fd closure|fd maturity|fd redemption|rd maturity|redemption|mf redemption)\b/;
+const REFUND = /\b(refund|reversal|reversed|cashback|chargeback)\b/;
+const SALARY = /\b(salary|sal|payroll|stipend)\b/;
+const INTEREST = /\b(int pd|interest|int credit|int cr)\b/;
+
+/**
+ * What kind of money movement a line is.
+ *
+ * The distinction that matters most is transfer against spending. A credit
+ * card bill paid from the bank moves money to the card — the spending already
+ * happened, line by line, on the card statement — and a transfer to your own
+ * account moves money you still have. Counting either as spending reports
+ * money gone that is not.
+ */
+export function classifyLine(
+  row: Pick<NormalizedRow, 'direction' | 'description' | 'merchantKey'>,
+  rules: MerchantRule[],
+): Classification {
+  const direction = row.direction ?? 'out';
+  const none = { category: null, savingsGoalId: null, incomeSourceId: null };
+
+  const rule = rules.find((r) => r.merchantKey === row.merchantKey && (r.direction ?? 'out') === direction);
+  if (rule && rule.kind && KINDS_FOR[direction].includes(rule.kind)) {
+    return {
+      kind: rule.kind,
+      category: rule.kind === 'expense' ? rule.category : null,
+      savingsGoalId: rule.kind === 'saving' ? (rule.savingsGoalId ?? null) : null,
+      incomeSourceId: rule.kind === 'income' ? (rule.incomeSourceId ?? null) : null,
+      source: 'rule',
+      reason: null,
+    };
+  }
+
+  const text = ` ${row.description.toLowerCase().replace(/[^a-z0-9]+/g, ' ')} `;
+
+  if (CARD_BILL.test(text)) {
+    return {
+      ...none,
+      kind: 'transfer',
+      source: 'keyword',
+      reason:
+        direction === 'out'
+          ? 'Looks like a credit card bill. The spending is on the card statement, so paying the bill is not counted again.'
+          : 'Looks like money moving to or from a card.',
+    };
+  }
+  if (OWN_TRANSFER.test(text)) {
+    return { ...none, kind: 'transfer', source: 'keyword', reason: 'Looks like money moved between your own accounts.' };
+  }
+
+  if (direction === 'out') {
+    if (SAVING_OUT.test(text)) {
+      return { ...none, kind: 'saving', source: 'keyword', reason: 'Looks like money put into an investment or deposit.' };
+    }
+    const suggestion = suggestCategory(row.merchantKey, rules);
+    return { ...none, kind: 'expense', category: suggestion.category, source: suggestion.source, reason: null };
+  }
+
+  if (SAVING_IN.test(text)) {
+    return { ...none, kind: 'saving', source: 'keyword', reason: 'Looks like a deposit or investment paying out.' };
+  }
+  if (REFUND.test(text)) {
+    return { ...none, kind: 'refund', source: 'keyword', reason: 'Looks like a refund. A refund is not income.' };
+  }
+  if (SALARY.test(text) || INTEREST.test(text)) {
+    return { ...none, kind: 'income', source: 'keyword', reason: null };
+  }
+  // Money in with nothing to say what it is: offered as income, never assumed.
+  return { ...none, kind: 'income', source: 'none', reason: null };
+}
+
+/* ------------------------------------------------------------------ */
+/* Transfers                                                           */
+/* ------------------------------------------------------------------ */
+
+/** A line from an earlier import, for finding the other leg of a transfer. */
+export interface OtherLine {
+  id: string;
+  direction: 'in' | 'out';
+  amountPaise: number;
+  occurredOn: string;
+  kind: LineKind | null;
+}
+
+export interface TransferPair {
+  /** The other leg in this file. */
+  rowNumber: number | null;
+  /** The other leg in an earlier import. */
+  otherRowId: string | null;
+}
+
+const PAIR_DAYS = 2;
+
+/**
+ * Lines that are probably two halves of one transfer.
+ *
+ * Between two statements, the same amount leaving one account and arriving in
+ * another within two days is the signature of moving your own money. Within
+ * one file that is not enough — a friend paying back ₹500 the day you spent
+ * ₹500 is ordinary — so a pair in the same file also needs one leg to read as
+ * a transfer.
+ */
+export function pairTransfers(rows: NormalizedRow[], others: OtherLine[]): Map<number, TransferPair> {
+  const pairs = new Map<number, TransferPair>();
+  const usable = rows.filter((r) => !r.problem && r.amountPaise !== null && r.occurredOn && r.direction);
+  const claimedOthers = new Set<string>();
+
+  const readsAsTransfer = (r: NormalizedRow) => classifyLine(r, []).kind === 'transfer';
+
+  for (const row of usable) {
+    if (pairs.has(row.rowNumber)) continue;
+
+    const sameFile = usable.find(
+      (other) =>
+        other.rowNumber !== row.rowNumber &&
+        !pairs.has(other.rowNumber) &&
+        other.direction !== row.direction &&
+        other.amountPaise === row.amountPaise &&
+        dayGap(other.occurredOn!, row.occurredOn!) <= PAIR_DAYS &&
+        (readsAsTransfer(row) || readsAsTransfer(other)),
+    );
+    if (sameFile) {
+      pairs.set(row.rowNumber, { rowNumber: sameFile.rowNumber, otherRowId: null });
+      pairs.set(sameFile.rowNumber, { rowNumber: row.rowNumber, otherRowId: null });
+      continue;
+    }
+
+    const earlier = others
+      .filter(
+        (o) =>
+          !claimedOthers.has(o.id) &&
+          o.direction !== row.direction &&
+          o.amountPaise === row.amountPaise &&
+          dayGap(o.occurredOn, row.occurredOn!) <= PAIR_DAYS,
+      )
+      .sort((a, b) => dayGap(a.occurredOn, row.occurredOn!) - dayGap(b.occurredOn, row.occurredOn!))[0];
+    if (earlier) {
+      claimedOthers.add(earlier.id);
+      pairs.set(row.rowNumber, { rowNumber: null, otherRowId: earlier.id });
+    }
+  }
+
+  return pairs;
 }
 
 /* ------------------------------------------------------------------ */
@@ -496,11 +687,19 @@ export interface ExistingSpend {
   amountPaise: number;
 }
 
+export interface ExistingIncome {
+  id: string;
+  receivedOn: string;
+  amountPaise: number;
+}
+
 export interface DuplicateMark {
   /** An earlier line of this file with the same date, amount and narration. */
   ofRow: number | null;
   /** A spend already recorded: same amount, a day either side. */
   ofSpend: string | null;
+  /** Income already recorded: same amount, a day either side. */
+  ofIncome: string | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -511,15 +710,27 @@ const dayGap = (a: string, b: string) =>
  * Which rows are probably already recorded.
  *
  * Two cases, both common rather than rare: a statement exported twice with
- * overlapping dates, and a spend typed in by hand on the day and then found
+ * overlapping dates, and money typed in by hand on the day and then found
  * again in the statement — often dated a day apart, since a card payment posts
  * the next day. Separate payments of the same amount carry different
  * references, so only an identical narration counts as a repeat within a file.
+ * Money in is checked against income the same way: a salary typed in on payday
+ * and imported a week later would otherwise be counted twice.
  */
-export function markDuplicates(rows: NormalizedRow[], existing: ExistingSpend[]): Map<number, DuplicateMark> {
+export function markDuplicates(
+  rows: NormalizedRow[],
+  existing: ExistingSpend[],
+  incomes: ExistingIncome[] = [],
+): Map<number, DuplicateMark> {
   const marks = new Map<number, DuplicateMark>();
   const seen = new Map<string, number>();
   const claimed = new Set<string>();
+
+  function closest<T extends { id: string; amountPaise: number }>(list: T[], date: (x: T) => string, row: NormalizedRow) {
+    return list
+      .filter((x) => !claimed.has(x.id) && x.amountPaise === row.amountPaise && dayGap(date(x), row.occurredOn!) <= 1)
+      .sort((a, b) => dayGap(date(a), row.occurredOn!) - dayGap(date(b), row.occurredOn!))[0];
+  }
 
   for (const row of rows) {
     if (row.problem || row.amountPaise === null || !row.occurredOn) continue;
@@ -527,20 +738,23 @@ export function markDuplicates(rows: NormalizedRow[], existing: ExistingSpend[])
     const signature = `${row.occurredOn}|${row.amountPaise}|${row.direction}|${row.description.toLowerCase()}`;
     const earlier = seen.get(signature);
     if (earlier !== undefined) {
-      marks.set(row.rowNumber, { ofRow: earlier, ofSpend: null });
+      marks.set(row.rowNumber, { ofRow: earlier, ofSpend: null, ofIncome: null });
       continue;
     }
     seen.set(signature, row.rowNumber);
 
-    if (row.direction !== 'out') continue;
-
-    const match = existing
-      .filter((s) => !claimed.has(s.id) && s.amountPaise === row.amountPaise && dayGap(s.spentOn, row.occurredOn!) <= 1)
-      .sort((a, b) => dayGap(a.spentOn, row.occurredOn!) - dayGap(b.spentOn, row.occurredOn!))[0];
-
-    if (match) {
-      claimed.add(match.id);
-      marks.set(row.rowNumber, { ofRow: null, ofSpend: match.id });
+    if (row.direction === 'out') {
+      const match = closest(existing, (s) => s.spentOn, row);
+      if (match) {
+        claimed.add(match.id);
+        marks.set(row.rowNumber, { ofRow: null, ofSpend: match.id, ofIncome: null });
+      }
+    } else {
+      const match = closest(incomes, (i) => i.receivedOn, row);
+      if (match) {
+        claimed.add(match.id);
+        marks.set(row.rowNumber, { ofRow: null, ofSpend: null, ofIncome: match.id });
+      }
     }
   }
 

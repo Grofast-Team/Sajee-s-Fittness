@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifyLine,
   detectDateOrder,
   findHeader,
   markDuplicates,
   merchantKey,
   normalizeRows,
+  pairTransfers,
   parseCsv,
   parseDate,
   parseMoney,
@@ -212,8 +214,8 @@ describe('a whole statement', () => {
     expect(lines[0].rowNumber).toBe(4);
 
     const marks = markDuplicates(lines, [{ id: 'typed', spentOn: '2026-09-02', amountPaise: 25_000 }]);
-    expect(marks.get(5)).toEqual({ ofRow: null, ofSpend: 'typed' });
-    expect(marks.get(9)).toEqual({ ofRow: 8, ofSpend: null });
+    expect(marks.get(5)).toEqual({ ofRow: null, ofSpend: 'typed', ofIncome: null });
+    expect(marks.get(9)).toEqual({ ofRow: 8, ofSpend: null, ofIncome: null });
     expect(marks.size).toBe(2);
   });
 });
@@ -235,7 +237,7 @@ describe('duplicates', () => {
       [row(1, '2026-09-01', 250, 'UPI/1234/SWIGGY'), row(2, '2026-09-01', 250, 'UPI/1234/SWIGGY')],
       [],
     );
-    expect(marks.get(2)).toEqual({ ofRow: 1, ofSpend: null });
+    expect(marks.get(2)).toEqual({ ofRow: 1, ofSpend: null, ofIncome: null });
     expect(marks.has(1)).toBe(false);
   });
 
@@ -255,7 +257,7 @@ describe('duplicates', () => {
         { id: 's2', spentOn: '2026-09-01', amountPaise: 99_900 },
       ],
     );
-    expect(marks.get(1)).toEqual({ ofRow: null, ofSpend: 's1' });
+    expect(marks.get(1)).toEqual({ ofRow: null, ofSpend: 's1', ofIncome: null });
     // Three days out is a different payment of the same amount.
     expect(marks.has(2)).toBe(false);
   });
@@ -267,5 +269,113 @@ describe('duplicates', () => {
     );
     expect(marks.get(1)?.ofSpend).toBe('s1');
     expect(marks.has(2)).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* What a line is                                                      */
+/* ------------------------------------------------------------------ */
+
+const line = (
+  rowNumber: number,
+  direction: 'in' | 'out',
+  rupees: number,
+  description: string,
+  occurredOn = '2026-09-05',
+): NormalizedRow => ({
+  rowNumber,
+  cells: [],
+  occurredOn,
+  description,
+  amountPaise: rupees * 100,
+  direction,
+  merchantKey: merchantKey(description),
+  problem: null,
+});
+
+describe('classifying a line', () => {
+  it('files ordinary money out as spending, with the category suggestion', () => {
+    const c = classifyLine(line(1, 'out', 250, 'UPI-SWIGGY-SWIGGY8@YBL-1-PAYMENT'), []);
+    expect(c).toMatchObject({ kind: 'expense', category: 'eating_out', source: 'keyword' });
+  });
+
+  /*
+   * A card bill paid from the bank is money moving to the card. The spending is
+   * on the card statement; counting the bill too would count it twice.
+   */
+  it('treats a credit card bill as a transfer, not spending', () => {
+    for (const narration of ['BIL/ONL/000123/CRED CLUB/CC PAYMENT', 'HDFC CREDIT CARD AUTOPAY 4XXX', 'NEFT DR-CC BILL PAYMENT SBI CARD']) {
+      const c = classifyLine(line(1, 'out', 18_000, narration), []);
+      expect(c.kind, narration).toBe('transfer');
+      expect(c.reason).toMatch(/card/i);
+    }
+  });
+
+  it('treats money moved to your own account as a transfer', () => {
+    expect(classifyLine(line(1, 'out', 5_000, 'IMPS-TRANSFER TO SELF-ICICI'), []).kind).toBe('transfer');
+    expect(classifyLine(line(1, 'in', 5_000, 'NEFT CR-OWN ACCOUNT TRANSFER'), []).kind).toBe('transfer');
+  });
+
+  it('recognises money put into investments or deposits as saving', () => {
+    for (const narration of ['ACH D- ZERODHA BROKING-SIP', 'NACH DR MUTUAL FUND SIP 09', 'RD INSTALLMENT 0012', 'GROWW INVEST']) {
+      expect(classifyLine(line(1, 'out', 5_000, narration), []).kind, narration).toBe('saving');
+    }
+  });
+
+  it('reads salary and interest as income, and a refund as a refund', () => {
+    expect(classifyLine(line(1, 'in', 50_000, 'NEFT CR-ACME PAYROLL-SALARY SEP'), [])).toMatchObject({ kind: 'income', source: 'keyword' });
+    expect(classifyLine(line(1, 'in', 312, 'INT.PD:01-06-2026 TO 31-08-2026'), []).kind).toBe('income');
+    expect(classifyLine(line(1, 'in', 499, 'UPI REFUND AMAZON'), []).kind).toBe('refund');
+  });
+
+  it('does not claim to know what an unexplained credit is', () => {
+    const c = classifyLine(line(1, 'in', 800, 'UPI/412345/RAVI KUMAR/okaxis'), []);
+    expect(c).toMatchObject({ kind: 'income', source: 'none' });
+  });
+
+  it('follows what the person taught it, per direction, including the goal and source', () => {
+    const rules = [
+      { merchantKey: 'zerodha', direction: 'out' as const, kind: 'saving' as const, category: null, savingsGoalId: 'g1', incomeSourceId: null },
+      { merchantKey: 'ravi kumar', direction: 'in' as const, kind: 'transfer' as const, category: null, savingsGoalId: null, incomeSourceId: null },
+      { merchantKey: 'ravi kumar', direction: 'out' as const, kind: 'expense' as const, category: 'rent' as const, savingsGoalId: null, incomeSourceId: null },
+    ];
+    expect(classifyLine(line(1, 'out', 5_000, 'ACH D- ZERODHA'), rules)).toMatchObject({ kind: 'saving', savingsGoalId: 'g1', source: 'rule' });
+    expect(classifyLine(line(1, 'in', 800, 'UPI/1/RAVI KUMAR/okaxis'), rules)).toMatchObject({ kind: 'transfer', source: 'rule' });
+    expect(classifyLine(line(1, 'out', 12_000, 'UPI/2/RAVI KUMAR/okaxis'), rules)).toMatchObject({ kind: 'expense', category: 'rent' });
+  });
+});
+
+describe('transfers between two statements', () => {
+  it('pairs money out of one account with the same amount into another, a couple of days apart', () => {
+    const rows = [line(4, 'out', 5_000, 'IMPS-P2A-9876-SAJEE', '2026-09-05')];
+    const pairs = pairTransfers(rows, [{ id: 'other-row', direction: 'in', amountPaise: 500_000, occurredOn: '2026-09-06', kind: 'income' }]);
+    expect(pairs.get(4)).toEqual({ rowNumber: null, otherRowId: 'other-row' });
+  });
+
+  it('pairs two legs in the same file only when one of them reads as a transfer', () => {
+    const plain = [line(1, 'out', 500, 'UPI/1/TEA'), line(2, 'in', 500, 'UPI/2/FRIEND')];
+    expect(pairTransfers(plain, []).size).toBe(0);
+
+    const self = [line(1, 'out', 5_000, 'IMPS TRANSFER TO SELF'), line(2, 'in', 5_000, 'NEFT CR-SAJEE')];
+    const pairs = pairTransfers(self, []);
+    expect(pairs.get(1)).toEqual({ rowNumber: 2, otherRowId: null });
+    expect(pairs.get(2)).toEqual({ rowNumber: 1, otherRowId: null });
+  });
+
+  it('does not pair across more than two days, or the same direction', () => {
+    const rows = [line(1, 'out', 5_000, 'IMPS-P2A', '2026-09-01')];
+    expect(pairTransfers(rows, [{ id: 'x', direction: 'in', amountPaise: 500_000, occurredOn: '2026-09-04', kind: null }]).size).toBe(0);
+    expect(pairTransfers(rows, [{ id: 'y', direction: 'out', amountPaise: 500_000, occurredOn: '2026-09-01', kind: null }]).size).toBe(0);
+  });
+});
+
+describe('income already recorded', () => {
+  it('matches money in against income typed in by hand', () => {
+    const marks = markDuplicates(
+      [line(1, 'in', 50_000, 'SALARY', '2026-09-01')],
+      [],
+      [{ id: 'inc1', receivedOn: '2026-09-01', amountPaise: 5_000_000 }],
+    );
+    expect(marks.get(1)).toEqual({ ofRow: null, ofSpend: null, ofIncome: 'inc1' });
   });
 });
