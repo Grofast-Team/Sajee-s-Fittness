@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Panel, PageHeader, Section, Unavailable, Why } from '@/components/ui';
-import { FromFoodLog, StockList } from '@/components/kitchen';
+import { KitchenBoard } from '@/components/kitchen';
 import { getKitchen } from '@/lib/data/pantry';
 import { formatQuantity } from '@/lib/engines/pantry';
 
@@ -53,15 +53,7 @@ export default async function KitchenPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
         <div className="space-y-4 lg:space-y-5">
-          {kitchen.pending.length > 0 ? (
-            <Panel tone="primary">
-              <FromFoodLog pending={kitchen.pending} />
-            </Panel>
-          ) : null}
-
-          <Panel>
-            <StockList items={kitchen.items} />
-          </Panel>
+          <KitchenBoard pending={kitchen.pending} items={kitchen.items} />
         </div>
 
         <div className="space-y-4 lg:space-y-5">

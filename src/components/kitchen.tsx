@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Loader2, Plus, Search, Trash2, X } from 'lucide-react';
-import { Alert, Badge, Button, Field, Section, inputClass, inputStyle } from '@/components/ui';
+import { Alert, Badge, Button, Field, Panel, Section, inputClass, inputStyle } from '@/components/ui';
 import { formatQuantity, type PantryItem, type PendingUse } from '@/lib/engines/pantry';
 import type { KitchenEntry, KitchenItemView } from '@/lib/data/pantry';
 import {
@@ -55,9 +55,39 @@ function useAction(onNotice: (n: Notice) => void, onDone?: () => void) {
 /* From the food log                                                   */
 /* ------------------------------------------------------------------ */
 
-export function FromFoodLog({ pending: uses }: { pending: PendingUse[] }) {
+/**
+ * Both kitchen panels, sharing one message.
+ *
+ * The message lives here rather than in either panel: settling the last food
+ * log empties "From your food log", which then is not rendered — and a message
+ * kept inside it vanished in the same moment, so the one confirmation that
+ * mattered was never seen.
+ */
+export function KitchenBoard({ pending, items }: { pending: PendingUse[]; items: KitchenItemView[] }) {
   const [notice, setNotice] = useState<Notice | null>(null);
 
+  return (
+    <>
+      {notice ? (
+        <div role="status">
+          <Alert tone={notice.ok ? 'success' : 'error'}>{notice.text}</Alert>
+        </div>
+      ) : null}
+
+      {pending.length > 0 ? (
+        <Panel tone="primary">
+          <FromFoodLog pending={pending} onNotice={setNotice} />
+        </Panel>
+      ) : null}
+
+      <Panel>
+        <StockList items={items} onNotice={setNotice} />
+      </Panel>
+    </>
+  );
+}
+
+function FromFoodLog({ pending: uses, onNotice }: { pending: PendingUse[]; onNotice: (n: Notice) => void }) {
   return (
     <Section title="From your food log" meta={`${uses.length} to check`}>
       <p className="measure text-sm leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
@@ -66,14 +96,9 @@ export function FromFoodLog({ pending: uses }: { pending: PendingUse[] }) {
       </p>
       <ul className="mt-3">
         {uses.map((use) => (
-          <PendingRow key={use.log.id} use={use} onNotice={setNotice} />
+          <PendingRow key={use.log.id} use={use} onNotice={onNotice} />
         ))}
       </ul>
-      {notice ? (
-        <div className="mt-3">
-          <Alert tone={notice.ok ? 'success' : 'error'}>{notice.text}</Alert>
-        </div>
-      ) : null}
     </Section>
   );
 }
@@ -110,8 +135,7 @@ function PendingRow({ use, onNotice }: { use: PendingUse; onNotice: (n: Notice) 
 /* Stock                                                               */
 /* ------------------------------------------------------------------ */
 
-export function StockList({ items }: { items: KitchenItemView[] }) {
-  const [notice, setNotice] = useState<Notice | null>(null);
+function StockList({ items, onNotice: setNotice }: { items: KitchenItemView[]; onNotice: (n: Notice) => void }) {
   const [adding, setAdding] = useState(items.length === 0);
 
   return (
@@ -128,12 +152,6 @@ export function StockList({ items }: { items: KitchenItemView[] }) {
           ))}
         </ul>
       )}
-
-      {notice ? (
-        <div className="mt-3">
-          <Alert tone={notice.ok ? 'success' : 'error'}>{notice.text}</Alert>
-        </div>
-      ) : null}
 
       {adding ? (
         <AddItemForm
