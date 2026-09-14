@@ -6,8 +6,9 @@ on 2026-09-14 with withdrawals and goal edits. Features 3, 4 and 5 were built
 on 2026-09-14, in the order 5, 3, 4: pushing migrations to the live project
 was held for the owner's approval, and Feature 5 was the only one that needed
 none, so it was the only one that could be verified end to end that day.
-Features 2 (withdrawals), 3 and 4 await migrations `20260903120016`–`18`; see
-`docs/STATUS.md`. Feature 6 has not been started.
+Migrations `20260903120016`–`18` were applied the same day and all five
+features are verified against the live project; see `docs/STATUS.md`.
+Feature 6 has not been started.
 
 The decisions each build made where this document left a choice open:
 

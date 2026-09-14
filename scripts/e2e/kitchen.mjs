@@ -94,8 +94,12 @@ try {
     await page.reload({ waitUntil: 'networkidle' });
     text = await body();
     check('food log offered', /From your food log/.test(text) && /would take 2/.test(text));
-    await page.getByRole('button', { name: 'From home' }).click();
-    await page.getByText('2 Egg, boiled taken from stock.').waitFor({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'From home', exact: true }).click();
+    await page.getByText('2 Egg, boiled taken from stock.').waitFor({ timeout: 30_000 }).catch(async (e) => {
+      await page.screenshot({ path: `${OUT}/kitchen-failure.png`, fullPage: true });
+      console.log(await body());
+      throw e;
+    });
     text = await body();
     check('from home: taken from stock, offer gone', /Egg, boiled\s*16/.test(text) && !/From your food log/.test(text));
 

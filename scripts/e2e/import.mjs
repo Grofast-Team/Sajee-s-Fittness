@@ -99,7 +99,11 @@ try {
 
     await page.getByRole('button', { name: /Check these 7 lines/ }).click();
     await page.waitForURL(/\/money\/import\/[0-9a-f-]{36}$/, { timeout: 60_000 });
-    await page.getByRole('heading', { name: 'Review the import' }).waitFor();
+    await page.getByRole('heading', { name: 'Review the import' }).waitFor({ timeout: 90_000 }).catch(async (e) => {
+      await page.screenshot({ path: `${OUT}/import-failure.png`, fullPage: true });
+      console.log(page.url(), '\n', await body());
+      throw e;
+    });
     text = await body();
     check('out tab: known merchants suggested', /DMART[\s\S]*Known merchant/.test(text));
     check('no guess for a person or a shop it does not know', /sharma kirana[\s\S]*No suggestion/.test(text));
