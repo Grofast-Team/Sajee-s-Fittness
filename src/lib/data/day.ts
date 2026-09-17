@@ -4,6 +4,7 @@ import { buildSamplePlan, SAMPLE_BODY, SAMPLE_CONTEXT, SAMPLE_TODAY_LOG } from '
 import { analyseTrend } from '@/lib/engines/trend';
 import { remainingForDay } from '@/lib/engines/nutrition';
 import type { Confidence, TrendResult, WeighIn } from '@/lib/engines/types';
+import type { MealSchedule } from '@/lib/engines/meal-times';
 
 /**
  * The read model for the app's day-to-day screens.
@@ -55,6 +56,11 @@ export interface DayView {
    *  than the server clock, so "Good evening" does not appear at 3pm for a user
    *  in Chennai being served from a machine in Washington. */
   timezone: string;
+  /** When they usually eat, and when they get up. Any of these may be null —
+   *  `src/lib/engines/meal-times.ts` derives the gaps from wake time rather
+   *  than asserting an hour the user never gave. */
+  mealSchedule: MealSchedule;
+  wakeTime: string | null;
   weightKg: number | null;
   waist: WaistView | null;
   constraints: Constraints;
@@ -109,6 +115,8 @@ function sampleDay(): DayView {
     isSample: true,
     displayName: SAMPLE_CONTEXT.displayName,
     timezone: 'Asia/Kolkata',
+    mealSchedule: { breakfast: '08:00', lunch: '13:30', dinner: '20:30' },
+    wakeTime: SAMPLE_CONTEXT.wakeTime,
     weightKg: SAMPLE_BODY.weightKg,
     waist: { latestCm: 94.5, changeCm: -1.5, overDays: 28 },
     constraints: {
@@ -213,7 +221,11 @@ export async function getDayView(date?: string): Promise<DayView> {
       .select('diet, allergies, disliked_foods, cook_minutes_weekday')
       .eq('user_id', userId)
       .maybeSingle(),
-    supabase.from('lifestyle').select('equipment').eq('user_id', userId).maybeSingle(),
+    supabase
+      .from('lifestyle')
+      .select('equipment, wake_time, breakfast_time, lunch_time, dinner_time')
+      .eq('user_id', userId)
+      .maybeSingle(),
     supabase
       .from('budgets')
       .select('amount, period, currency_code')
@@ -271,6 +283,12 @@ export async function getDayView(date?: string): Promise<DayView> {
     isSample: false,
     displayName: profileRes.data?.display_name || '',
     timezone: profileRes.data?.timezone || 'Asia/Kolkata',
+    mealSchedule: {
+      breakfast: lifestyleRes.data?.breakfast_time ?? null,
+      lunch: lifestyleRes.data?.lunch_time ?? null,
+      dinner: lifestyleRes.data?.dinner_time ?? null,
+    },
+    wakeTime: lifestyleRes.data?.wake_time ?? null,
     weightKg: weighIns.length > 0 ? weighIns[weighIns.length - 1].weightKg : null,
     waist,
     constraints: {

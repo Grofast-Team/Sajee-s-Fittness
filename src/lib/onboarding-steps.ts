@@ -192,6 +192,17 @@ export const STEPS: Step[] = [
       { id: 'sleepTime', label: 'What time do you usually get to bed?', type: 'time' },
       { id: 'sleepHours', label: 'How many hours do you usually sleep?', type: 'number', unit: 'hours', min: 0, max: 16 },
       {
+        id: 'breakfastTime',
+        label: 'What time do you usually eat your first meal?',
+        type: 'time',
+        because:
+          'So we can ask about a meal while you still remember it. Asked three hours late, ' +
+          'you are reconstructing it; asked just after, you are describing it. Leave these ' +
+          'blank and we will work them out from when you wake up.',
+      },
+      { id: 'lunchTime', label: 'And your midday meal?', type: 'time' },
+      { id: 'dinnerTime', label: 'And your evening meal?', type: 'time' },
+      {
         id: 'baselineSteps',
         label: 'Roughly how many steps do you walk a day?',
         type: 'number',

@@ -53,6 +53,11 @@ export const answersSchema = z.object({
   shiftEnd: z.string().optional(),
   wakeTime: z.string().optional(),
   sleepTime: z.string().optional(),
+  // All three optional: absent means "derive it from wake_time", which is a
+  // better answer than a fixed hour the user never chose.
+  breakfastTime: z.string().optional(),
+  lunchTime: z.string().optional(),
+  dinnerTime: z.string().optional(),
   sleepHours: z.coerce.number().min(0).max(16).optional(),
   baselineSteps: z.coerce.number().int().min(0).max(60000).optional(),
 

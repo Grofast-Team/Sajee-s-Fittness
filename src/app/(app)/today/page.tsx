@@ -10,7 +10,16 @@ import { getNextStep } from '@/lib/data/next-step';
 import { getLastPlanChange } from '@/lib/data/plan-changes';
 import { getInbox } from '@/lib/data/notifications';
 import { greeting } from '@/lib/greeting';
+import { localClock } from '@/lib/local-time';
 import { stepsToMinutes } from '@/lib/engines/steps';
+import { pendingMeal } from '@/lib/engines/meal-times';
+import type { ScheduledMeal } from '@/lib/engines/meal-times';
+
+const MEAL_LABEL: Record<ScheduledMeal, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+};
 
 export const metadata = { title: 'Today — FitCoach' };
 
@@ -38,6 +47,15 @@ export default async function TodayPage() {
   ]);
 
   const stepsShort = day.stepsToday === null ? null : Math.max(0, day.stepTarget - day.stepsToday);
+
+  // Which meal is worth asking about. Computed against the user's own
+  // timezone, because the server rendering this could be anywhere.
+  const due = pendingMeal({
+    now: localClock(day.timezone),
+    schedule: day.mealSchedule,
+    wakeTime: day.wakeTime,
+    logged: day.items.map((entry) => entry.meal),
+  });
 
   const remaining = day.remaining.kcalRemaining;
   const over = remaining < 0;
@@ -239,6 +257,27 @@ export default async function TodayPage() {
               title="Meals"
               meta={day.items.length > 0 ? `${day.items.length} logged` : undefined}
             >
+              {/* One quiet line, not a banner and not a list of everything
+                  missed. A day that has gone badly does not need the app to
+                  enumerate it. */}
+              {due ? (
+                <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span style={{ color: 'var(--fg-muted)' }}>
+                    {MEAL_LABEL[due.meal]}
+                    {due.isDefault ? ' is usually' : ' was'} around {due.atClock}
+                    {'. '}
+                    Not logged yet.
+                  </span>
+                  <Link
+                    href={`/food?meal=${due.meal}`}
+                    className="font-medium underline underline-offset-4"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    Add it
+                  </Link>
+                </p>
+              ) : null}
+
               {day.items.length > 0 ? (
                 <ul>
                   {day.items.map((entry) => (
