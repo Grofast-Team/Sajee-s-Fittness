@@ -96,6 +96,7 @@ Live verification performed:
 | Quick add | **Done** — the foods you log most, replayed in one tap. Ordered by how often each has been logged, and keyed on food *and* portion so 150 g and 250 g of the same thing stay separate choices |
 | Editing a logged entry | **Done** — `updateFoodLog` changes the quantity or the meal and recomputes nutrition through the same path the insert uses; the rollup trigger already handled UPDATE, so the day's totals follow |
 | Meal times and the unlogged-meal prompt | **Done**, tested — onboarding asks when they usually eat; Today names the one meal not logged yet. Measured in minutes since waking rather than clock time, so a night-shift schedule that crosses midnight works; all three times are optional and derive from `wake_time` when absent |
+| Personal portion calibration | **Done**, tested — once someone weighs a household measure, `calibrateServing` resolves it from their own median instead of the shared `food_servings` guess. Derived on read from `food_logs`, so there is no second copy to drift. Confidence rises only when repeated weighings *agree*, so a portion that genuinely varies is not reported as precise |
 | Barcode scanning | **Not built** — shown as unavailable |
 
 ## Phase 4 — Activity
