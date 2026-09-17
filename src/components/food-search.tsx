@@ -232,6 +232,8 @@ function PortionPicker({
   const [grams, setGrams] = useState<number>(food.defaultServingG ?? 100);
   const [servingIndex, setServingIndex] = useState(0);
   const [count, setCount] = useState(1);
+  /** Total grams for a household portion the user actually put on a scale. */
+  const [weighedGrams, setWeighedGrams] = useState<number | null>(null);
   const [meal, setMeal] = useState<string>(() => defaultMeal(new Date().getHours()));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -241,9 +243,13 @@ function PortionPicker({
   const portion =
     mode === 'grams'
       ? resolvePortion({ userGrams: grams })
-      : resolvePortion({
-          household: { unitLabel: serving.unitLabel, grams: serving.grams, count },
-        });
+      : // A weight they measured settles the portion; the count is then only
+        // describing what was on the scale.
+        weighedGrams !== null
+        ? resolvePortion({ userGrams: weighedGrams })
+        : resolvePortion({
+            household: { unitLabel: serving.unitLabel, grams: serving.grams, count },
+          });
 
   const estimate = estimateNutrition(food, portion);
 
@@ -273,7 +279,14 @@ function PortionPicker({
     const result = await logFood({
       foodId: food.id,
       meal,
-      ...(mode === 'grams' ? { grams } : { serving: { unitLabel: serving.unitLabel, count } }),
+      ...(mode === 'grams'
+        ? { grams }
+        : {
+            serving: { unitLabel: serving.unitLabel, count },
+            // Sending both is what records "2 dosa weighed 170 g", the entry
+            // calibration reads back later.
+            ...(weighedGrams !== null ? { grams: weighedGrams } : {}),
+          }),
     });
 
     if (result.ok) {
@@ -400,6 +413,41 @@ function PortionPicker({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/*
+            The one entry that teaches the app something durable. Optional, and
+            placed under the count rather than as a third tab, because it is
+            not a different way to log — it is the same log with the guesswork
+            removed. Weighing once makes every later "2 dosa" right.
+          */}
+          <label
+            htmlFor="weighed"
+            className="mt-3 block text-sm"
+            style={{ color: 'var(--fg-muted)' }}
+          >
+            Weighed it? Enter the total, and we will remember what your{' '}
+            {serving.unitLabel} weighs.
+          </label>
+          <div className="mt-1.5 flex items-center gap-2">
+            <input
+              id="weighed"
+              type="number"
+              inputMode="decimal"
+              min={1}
+              max={5000}
+              placeholder="optional"
+              value={weighedGrams ?? ''}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setWeighedGrams(e.target.value === '' || !next ? null : next);
+              }}
+              className={`data ${inputClass} !w-28`}
+              style={inputStyle}
+            />
+            <span className="shrink-0 text-sm" style={{ color: 'var(--fg-subtle)' }}>
+              g total
+            </span>
           </div>
         </Field>
       )}

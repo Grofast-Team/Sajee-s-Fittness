@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
 import { resolvePortion } from '@/lib/engines/portion';
 import { estimateNutrition, type FoodDensity } from '@/lib/engines/nutrition';
+import { getCalibratedServing } from '@/lib/data/calibration';
 
 /**
  * Writing a food log entry.
@@ -49,10 +50,23 @@ export type LogResult =
   | { ok: true; kcal: number; proteinG: number }
   | { ok: false; error: string };
 
-/** What a portion request looks like, in either of the two accepted forms. */
+type Serving = { unitLabel: string; count: number };
+
+/**
+ * What a portion request looks like.
+ *
+ * The third form — a count *and* a weight — is the one that teaches the app
+ * something: it is the only entry that says how much one of this person's
+ * dosas actually weighs. `portion_basis` stays `user_input` for it rather
+ * than `kitchen_scale`, because in this codebase `kitchen_scale` means a
+ * display read by the vision model, and a typed number is the user's word.
+ * Calibration finds these rows by their shape instead — a household
+ * `unit_label` whose grams did not come from the shared serving table.
+ */
 type PortionSpec =
   | { grams: number; serving?: undefined }
-  | { grams?: undefined; serving: { unitLabel: string; count: number } };
+  | { grams?: undefined; serving: Serving }
+  | { grams: number; serving: Serving };
 
 /** Everything a `food_logs` row needs, once a portion has been resolved. */
 interface ComputedEntry {
@@ -123,7 +137,21 @@ async function computeEntry(
   let quantity: number;
   let unitLabel: string;
 
-  if (spec.grams !== undefined) {
+  if (spec.grams !== undefined && spec.serving !== undefined) {
+    /*
+     * A measured household portion: "2 dosa, and I weighed them at 170 g".
+     *
+     * This is the only entry that teaches the app anything durable about this
+     * person's portions. The weight is theirs, so it is used as-is and never
+     * reconciled against the shared `food_servings` figure — the whole point
+     * is that the shared figure is a guess about everybody and this is a fact
+     * about their kitchen. `calibrateServing` reads these rows back later.
+     */
+    portionInput = { userGrams: spec.grams };
+    description = `${spec.serving.count} × ${spec.serving.unitLabel} ${food.name} (weighed)`;
+    quantity = spec.serving.count;
+    unitLabel = spec.serving.unitLabel;
+  } else if (spec.grams !== undefined) {
     portionInput = { userGrams: spec.grams };
     description = `${spec.grams} g ${food.name}`;
     quantity = spec.grams;
@@ -143,12 +171,20 @@ async function computeEntry(
       };
     }
 
+    // Their own weighings beat the shared figure where they exist. This is
+    // what makes weighing something once pay off on every later entry.
+    const calibrated = await getCalibratedServing(
+      foodId,
+      servingRow.unit_label,
+      Number(servingRow.grams),
+    );
+
     portionInput = {
       household: {
         unitLabel: servingRow.unit_label,
-        grams: Number(servingRow.grams),
+        grams: calibrated.grams ?? Number(servingRow.grams),
         count: spec.serving.count,
-        confidence: servingRow.confidence,
+        confidence: calibrated.source === 'yours' ? calibrated.confidence : servingRow.confidence,
       },
     };
     description = `${spec.serving.count} × ${servingRow.unit_label} ${food.name}`;
