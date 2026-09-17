@@ -95,6 +95,7 @@ Live verification performed:
 | Recipes schema + nutrition derivation | **Done** (SQL); **no recipe seed data yet** |
 | Quick add | **Done** — the foods you log most, replayed in one tap. Ordered by how often each has been logged, and keyed on food *and* portion so 150 g and 250 g of the same thing stay separate choices |
 | Editing a logged entry | **Done** — `updateFoodLog` changes the quantity or the meal and recomputes nutrition through the same path the insert uses; the rollup trigger already handled UPDATE, so the day's totals follow |
+| Meal times and the unlogged-meal prompt | **Done**, tested — onboarding asks when they usually eat; Today names the one meal not logged yet. Measured in minutes since waking rather than clock time, so a night-shift schedule that crosses midnight works; all three times are optional and derive from `wake_time` when absent |
 | Barcode scanning | **Not built** — shown as unavailable |
 
 ## Phase 4 — Activity
