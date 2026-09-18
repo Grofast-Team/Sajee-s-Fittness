@@ -26,7 +26,7 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 const quantity = z.number().positive().max(MAX_QUANTITY);
 
 function refresh() {
-  revalidatePath('/food/kitchen');
+  revalidatePath('/kitchen');
 }
 
 async function signedIn(): Promise<{ supabase: Client; userId: string } | null> {

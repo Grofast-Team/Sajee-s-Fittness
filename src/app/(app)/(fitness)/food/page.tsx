@@ -35,7 +35,7 @@ export default async function FoodPage() {
         lede={day.remaining.message}
         action={
           <Link
-            href="/food/kitchen"
+            href="/kitchen"
             className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium"
             style={{ color: 'var(--primary-dark)' }}
           >
