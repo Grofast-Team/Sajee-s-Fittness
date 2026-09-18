@@ -69,7 +69,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
       // `private.handle_new_user()` reads this to seed the profile row, so the
       // onboarding UI never has to handle a missing-row state.
       data: { display_name: displayName },
-      emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
+      emailRedirectTo: `${origin}/auth/callback?next=/onboarding-name`,
     },
   });
 

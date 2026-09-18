@@ -14,11 +14,19 @@ import { needsOnboarding } from '@/lib/data/onboarding-state';
  * unreadable line on a 1920px monitor.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // A signed-in user with no plan has not finished setup. Showing them the
-  // sample profile — someone else's numbers behind a warning banner — is worse
-  // than useless: it looks like the app is broken. Send them to finish instead.
+  // The only thing required before reaching the app at all is the minimal
+  // signup step - a name, nothing else. Fitness, Money and every other
+  // category are opt-in from Profile, not gated here.
+  //
+  // Known transitional condition, accepted deliberately: until the Fitness
+  // route-group guard in (app)/(fitness)/layout.tsx ships (design spec
+  // section 4, a later phase), a user who reaches this point without ever
+  // running the Fitness interview can still open /today with no active
+  // plan. That guard is the fix - not a check added here - so this gap is
+  // accepted as temporary rather than patched in two places that would then
+  // both be responsible for the same question.
   if (await needsOnboarding()) {
-    redirect('/onboarding');
+    redirect('/onboarding-name');
   }
 
   return (
