@@ -161,9 +161,23 @@ export async function saveOnboarding(rawAnswers: unknown): Promise<SaveResult> {
           experience: experienceFor(assessment.level),
           fitness_level: assessment.level,
           onboarding_step: 8,
-          onboarding_done_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
+      ),
+
+      // Completing the interview is what enables Fitness - not a separate
+      // toggle action, which does not exist yet (a later phase). See design
+      // spec section 5: Fitness can only become enabled through a
+      // successfully completed saveOnboarding, or when a plan already
+      // exists. This is that half of the invariant.
+      supabase.from('user_categories').upsert(
+        {
+          user_id: userId,
+          category_key: 'fitness',
+          enabled: true,
+          enabled_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,category_key' },
       ),
 
       supabase.from('lifestyle').upsert(
