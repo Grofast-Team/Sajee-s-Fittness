@@ -206,11 +206,32 @@ an explicit guard:
 await requireCategoryEnabled(userId, 'fitness');
 ```
 
-Applied to: `logMeasurement`, `logSteps`, `logWater`, `logSleep`, `logFood`,
-`updateSession`, `ensureWeekPlanned`, `logSessionFeedback`,
-`saveFitnessAssessment`, the step-sync ingest action, and the weekly-review /
-`adapt()` action. Eleven call sites, named explicitly here so none of them get
-missed during implementation.
+Applied to eleven single-user call sites: `logMeasurement`, `logSteps`,
+`logWater`, `logSleep`, `logFood`, `updateSession`, `ensureWeekPlanned`,
+`logSessionFeedback`, `saveFitnessAssessment`, `syncStepSegments`
+(`steps-sync.ts`), and `reviewMyPlan` (`weekly-review.ts`). Named explicitly,
+by their actual exported function names, so none get missed or double-counted
+during implementation.
+
+**A twelfth site needs a different mechanism, not the same guard.**
+`weekly-review.ts` exports a second function, `reviewAllDueUsers` — the cron
+target behind `/api/cron/review` — which does not act on behalf of one caller.
+It currently selects its candidates directly from `plans.is_active = true`:
+
+```ts
+const { data: plans } = await supabase.from('plans').select('user_id').eq('is_active', true);
+```
+
+That is exactly the runtime-inference-from-`plans` pattern §2 forbids for the
+resolver, and it means the cron would silently keep adjusting a plan for
+someone who has explicitly disabled Fitness — `requireCategoryEnabled` can't
+fix this, since there is no single `userId` to check at entry. The fix is in
+the selection query itself: join against `user_categories` and filter to
+`category_key = 'fitness' and enabled = true`, replacing the bare
+`plans.is_active` filter rather than layering a guard on top of it.
+
+Twelve sites in total, of two distinct shapes — eleven guarded at entry,
+one guarded in its own selection query.
 
 **Explicitly exempt:** `updateFoodLog`, `deleteFoodLog`, and `saveOnboarding`
 itself (it is the action that *creates* the enabled state — gating it on that
@@ -319,8 +340,13 @@ this design process. Cosmetic, no functional dependency on this build.
 - The visibility algorithm (§7) and any pure registry lookups: unit tests, no
   I/O — same discipline as `src/lib/engines`.
 - `requireCategoryEnabled`: tests for the enabled/disabled/missing-row cases,
-  and that it is actually wired into all eleven call sites named in §8 — not
-  just that the helper itself is correct.
+  and that it is actually wired into all eleven single-user call sites named
+  in §8 — not just that the helper itself is correct.
+- `reviewAllDueUsers`: a test seeding one user with Fitness enabled and one
+  with it disabled, both with active plans, asserting the disabled user's
+  plan is untouched by the run. This is the one guard that can't be tested by
+  calling the helper in isolation, since the fix lives in a query, not a
+  function call.
 - The Fitness toggle invariant (§5): a test asserting that an abandoned
   onboarding leaves no `user_categories` row, not just that a completed one
   leaves the right one.
@@ -335,7 +361,8 @@ this design process. Cosmetic, no functional dependency on this build.
 2. Minimal signup step (`onboarding-name`) + the `(app)/layout.tsx` gate
    change + `saveOnboarding`'s two column-ownership changes (§3).
 3. `(app)/(fitness)/layout.tsx` route-group guard (§4) + the eleven
-   `requireCategoryEnabled` call sites (§8).
+   `requireCategoryEnabled` call sites + the `reviewAllDueUsers` query fix
+   (§8).
 4. Dashboard + Profile screens (§10, §11) + the toggle actions (§5).
 5. The existing-user backfill migration (§9), applied and verified last, once
    everything it backfills *for* actually exists to be tested against.
