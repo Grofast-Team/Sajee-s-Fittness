@@ -298,11 +298,29 @@ export async function reviewAllDueUsers(): Promise<{ reviewed: number; changed: 
     .select('user_id')
     .eq('is_active', true);
 
+  const candidateIds = (plans ?? []).map((row) => row.user_id as string);
+  if (candidateIds.length === 0) return { reviewed: 0, changed: 0 };
+
+  // An active plan alone is not enough - this must not silently keep
+  // adjusting a plan for someone who has explicitly disabled Fitness.
+  // requireCategoryEnabled takes a single user id and does not fit a
+  // batch job with no single caller, so this filters the candidate list
+  // directly instead: the same rule, applied as a query rather than a
+  // per-call guard.
+  const { data: enabledRows } = await supabase
+    .from('user_categories')
+    .select('user_id')
+    .in('user_id', candidateIds)
+    .eq('category_key', 'fitness')
+    .eq('enabled', true);
+  const enabledIds = new Set((enabledRows ?? []).map((row) => row.user_id as string));
+
   let reviewed = 0;
   let changed = 0;
 
-  for (const row of plans ?? []) {
-    const result = await reviewUser(supabase as unknown as Client, row.user_id as string);
+  for (const userId of candidateIds) {
+    if (!enabledIds.has(userId)) continue;
+    const result = await reviewUser(supabase as unknown as Client, userId);
     if (result.ok) {
       reviewed += 1;
       if (result.changed) changed += 1;
