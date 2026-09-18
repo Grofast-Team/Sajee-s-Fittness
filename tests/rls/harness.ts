@@ -169,6 +169,7 @@ export const OWNER_TABLES = [
   'fitness_assessments',
   'session_feedback',
   'skill_unlocks',
+  'user_categories',
   'user_habits',
   'habit_checkins',
   'coach_threads',
