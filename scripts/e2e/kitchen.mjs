@@ -1,4 +1,4 @@
-// End-to-end check of /food/kitchen with a throwaway @example.test user.
+// End-to-end check of /kitchen with a throwaway @example.test user.
 // Runs the full flow when the kitchen tables exist; otherwise checks the page
 // says so plainly.
 // Usage (from the project root): node --env-file=.env.local scripts/e2e/kitchen.mjs [baseUrl]
@@ -36,6 +36,11 @@ try {
   });
   if (planError) throw planError;
 
+  const { error: categoryError } = await admin.from('user_categories').insert({
+    user_id: userId, category_key: 'fitness', enabled: true, enabled_at: new Date().toISOString(),
+  });
+  if (categoryError) throw categoryError;
+
   const user = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -53,12 +58,12 @@ try {
 
   await page.goto(`${BASE}/food`, { waitUntil: 'networkidle', timeout: 90_000 });
   await page.getByRole('link', { name: 'Kitchen stock' }).click();
-  await page.waitForURL(/\/food\/kitchen/, { timeout: 60_000 });
+  await page.waitForURL(/\/kitchen/, { timeout: 60_000 });
   await page.getByRole('heading', { name: 'Kitchen', exact: true }).waitFor({ timeout: 60_000 }).catch(async (e) => {
     await page.screenshot({ path: `${OUT}/kitchen-failure.png`, fullPage: true });
     throw e;
   });
-  check('link from the food screen', page.url().endsWith('/food/kitchen'));
+  check('link from the food screen', page.url().endsWith('/kitchen'));
 
   const body = () => page.locator('body').innerText();
   let text = await body();
@@ -122,7 +127,7 @@ try {
 
   const phone = await browser.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'dark', storageState: await context.storageState() });
   const p2 = await phone.newPage();
-  await p2.goto(`${BASE}/food/kitchen`, { waitUntil: 'networkidle', timeout: 90_000 });
+  await p2.goto(`${BASE}/kitchen`, { waitUntil: 'networkidle', timeout: 90_000 });
   await p2.screenshot({ path: `${OUT}/kitchen-phone-dark.png`, fullPage: true });
   const overflow = await p2.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check('phone: no sideways scroll', overflow <= 0, `${overflow}px`);

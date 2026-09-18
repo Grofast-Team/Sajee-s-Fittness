@@ -18,6 +18,17 @@ import { isCategoryVisible } from '@/lib/engines/categories';
  * not exist until Phase 4 - running the interview is currently the only
  * working way to enable Fitness, so both cases land there for now. This
  * gets corrected to the exact section 6 table once /profile ships.
+ *
+ * One more thing worth knowing if you're ever debugging this: the
+ * redirect() calls below do not always produce a raw HTTP 307. The parent
+ * route's loading.tsx creates a Suspense boundary, and if this layout's
+ * own async work here (the two Supabase calls above) hasn't resolved by
+ * the time Next.js starts streaming the response, the initial response
+ * already committed a 200 before redirect() ever threw - so Next.js falls
+ * back to a client-side meta-refresh/script redirect instead. This is
+ * normal, accepted behaviour, not a bug: the gated page component below
+ * this layout never executes either way, so no fitness data - real or
+ * placeholder - is ever rendered during that brief window.
  */
 export default async function FitnessLayout({ children }: { children: React.ReactNode }) {
   if (!supabaseConfigured) return children;

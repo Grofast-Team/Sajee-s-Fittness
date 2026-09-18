@@ -62,6 +62,11 @@ try {
   });
   if (planError) throw planError;
 
+  const { error: categoryError } = await admin.from('user_categories').insert({
+    user_id: userId, category_key: 'fitness', enabled: true, enabled_at: new Date().toISOString(),
+  });
+  if (categoryError) throw categoryError;
+
   const user = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

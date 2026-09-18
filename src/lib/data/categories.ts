@@ -15,11 +15,19 @@ export async function getEnabledCategories(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<ReadonlySet<string>> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('user_categories')
     .select('category_key')
     .eq('user_id', userId)
     .eq('enabled', true);
+
+  // Fails closed on purpose - an ambiguous result must never read as
+  // "enabled". But failing closed silently turns a transient Supabase
+  // fault or an RLS regression into an invisible mass lockout, so it is
+  // logged here rather than swallowed.
+  if (error) {
+    console.error('getEnabledCategories query failed', userId, error);
+  }
 
   return new Set((data ?? []).map((row) => row.category_key as string));
 }
