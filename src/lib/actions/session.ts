@@ -10,6 +10,7 @@ import {
   decideProgression,
   type AssessmentAnswers,
 } from '@/lib/engines/progression';
+import { requireCategoryEnabled } from '@/lib/data/categories';
 
 /**
  * Recording how a session went, and acting on it.
@@ -55,6 +56,9 @@ export async function logSessionFeedback(input: unknown): Promise<SessionResult>
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in.' };
   const userId = auth.user.id;
+
+  const guard = await requireCategoryEnabled(supabase, userId, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const { error } = await supabase.from('session_feedback').insert({
     user_id: userId,
@@ -161,6 +165,9 @@ export async function saveFitnessAssessment(input: unknown): Promise<SessionResu
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in.' };
+
+  const guard = await requireCategoryEnabled(supabase, auth.user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const result = assessFitnessLevel(parsed.data as AssessmentAnswers);
 

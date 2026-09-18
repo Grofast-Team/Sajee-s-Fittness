@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
+import { requireCategoryEnabled } from '@/lib/data/categories';
 
 /**
  * Weight, measurements, steps and water.
@@ -65,6 +66,9 @@ export async function logMeasurement(input: unknown): Promise<TrackResult> {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, error: 'You need to be signed in to record this.' };
 
+  const guard = await requireCategoryEnabled(supabase, user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
+
   const measuredOn = m.measuredOn ?? new Date().toISOString().slice(0, 10);
 
   // One row per day. Re-entering corrects the day rather than creating a second
@@ -121,6 +125,9 @@ export async function logSteps(input: unknown): Promise<TrackResult> {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, error: 'You need to be signed in to record this.' };
 
+  const guard = await requireCategoryEnabled(supabase, user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
+
   const logDate = parsed.data.logDate ?? new Date().toISOString().slice(0, 10);
 
   // Source is recorded so provenance survives. A device reading beats a manual
@@ -164,6 +171,9 @@ export async function logWater(input: unknown): Promise<TrackResult> {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, error: 'You need to be signed in to record this.' };
 
+  const guard = await requireCategoryEnabled(supabase, user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
+
   // Append-only: each glass is its own row, so the dashboard can show *when*
   // as well as how much.
   const { error } = await supabase.from('water_logs').insert({
@@ -199,6 +209,9 @@ export async function logSleep(input: unknown): Promise<TrackResult> {
 
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, error: 'You need to be signed in to record this.' };
+
+  const guard = await requireCategoryEnabled(supabase, user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const { error } = await supabase.from('sleep_logs').upsert(
     {

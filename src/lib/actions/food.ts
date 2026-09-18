@@ -7,6 +7,7 @@ import { supabaseConfigured } from '@/lib/config';
 import { resolvePortion } from '@/lib/engines/portion';
 import { estimateNutrition, type FoodDensity } from '@/lib/engines/nutrition';
 import { getCalibratedServing } from '@/lib/data/calibration';
+import { requireCategoryEnabled } from '@/lib/data/categories';
 
 /**
  * Writing a food log entry.
@@ -244,6 +245,9 @@ export async function logFood(input: unknown): Promise<LogResult> {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in to log food.' };
+
+  const guard = await requireCategoryEnabled(supabase, auth.user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const computed = await computeEntry(
     supabase,

@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { supabaseConfigured } from '@/lib/config';
 import { adapt, type AdaptationResult } from '@/lib/engines/adaptation';
 import { analyseTrend } from '@/lib/engines/trend';
+import { requireCategoryEnabled } from '@/lib/data/categories';
 
 /**
  * The weekly review: the thing that makes the plan adaptive.
@@ -272,6 +273,9 @@ export async function reviewMyPlan(): Promise<ReviewResult> {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in.' };
+
+  const guard = await requireCategoryEnabled(supabase, auth.user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const result = await reviewUser(supabase, auth.user.id);
 

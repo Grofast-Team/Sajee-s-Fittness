@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
 import { buildWeek, dateForDay, weekStart } from '@/lib/engines/training';
 import { restrictionsFrom, type SafetyFlag } from '@/lib/engines/safety';
+import { requireCategoryEnabled } from '@/lib/data/categories';
 
 /**
  * Scheduling and completing training sessions.
@@ -34,6 +35,9 @@ export async function ensureWeekPlanned(forDate?: string): Promise<TrainingResul
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in.' };
   const userId = auth.user.id;
+
+  const guard = await requireCategoryEnabled(supabase, userId, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const monday = weekStart(forDate ? new Date(`${forDate}T00:00:00Z`) : new Date());
   const sunday = dateForDay(monday, 6);
@@ -145,6 +149,9 @@ export async function updateSession(input: unknown): Promise<TrainingResult> {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in.' };
+
+  const guard = await requireCategoryEnabled(supabase, auth.user.id, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   const { error } = await supabase
     .from('workout_plans')

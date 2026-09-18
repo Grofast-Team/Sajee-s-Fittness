@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
 import { assessSteps } from '@/lib/engines/step-validity';
+import { requireCategoryEnabled } from '@/lib/data/categories';
 
 /**
  * Ingest step segments read from the platform health store.
@@ -58,6 +59,9 @@ export async function syncStepSegments(input: unknown): Promise<StepSyncResult> 
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'You need to be signed in.' };
   const userId = auth.user.id;
+
+  const guard = await requireCategoryEnabled(supabase, userId, 'fitness');
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   // The verdict is reached here, from the raw segments, every time.
   const result = assessSteps(segments, workouts);
