@@ -13,11 +13,9 @@ import { isCategoryVisible } from '@/lib/engines/categories';
  * lives, wrapping only the five routes that need it: today, activity,
  * food, progress, coach.
  *
- * Interim redirect target: /onboarding for both failure cases below.
- * Design spec section 6 says "not enabled -> /profile", but /profile does
- * not exist until Phase 4 - running the interview is currently the only
- * working way to enable Fitness, so both cases land there for now. This
- * gets corrected to the exact section 6 table once /profile ships.
+ * Redirect targets match design spec section 6 exactly now that /profile
+ * exists: not enabled -> /profile, enabled but no active plan ->
+ * /onboarding (the interview is still the only way to create one).
  *
  * One more thing worth knowing if you're ever debugging this: the
  * redirect() calls below do not always produce a raw HTTP 307. The parent
@@ -39,7 +37,7 @@ export default async function FitnessLayout({ children }: { children: React.Reac
 
   const enabled = await getEnabledCategories(supabase, auth.user.id);
   if (!isCategoryVisible('fitness', enabled)) {
-    redirect('/onboarding');
+    redirect('/profile');
   }
 
   const { data: plan } = await supabase

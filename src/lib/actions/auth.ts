@@ -5,8 +5,6 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { supabaseConfigured } from '@/lib/config';
-import { getEnabledCategories } from '@/lib/data/categories';
-import { isCategoryVisible } from '@/lib/engines/categories';
 
 /**
  * Auth server actions.
@@ -41,21 +39,14 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   if (invalid) return { error: invalid };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return { error: 'Those details did not match an account. Check them and try again.' };
   }
 
   revalidatePath('/', 'layout');
-
-  // /today is gated on Fitness being enabled (see (app)/(fitness)/layout.tsx).
-  // Sending every sign-in there unconditionally would bounce a Fitness-disabled
-  // user into /onboarding, which has no navigation at all - a dead end. /money
-  // is never gated and always has full nav, so it is the safe default landing
-  // page for anyone who hasn't enabled Fitness.
-  const enabled = data.user ? await getEnabledCategories(supabase, data.user.id) : new Set<string>();
-  redirect(isCategoryVisible('fitness', enabled) ? '/today' : '/money');
+  redirect('/dashboard');
 }
 
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
