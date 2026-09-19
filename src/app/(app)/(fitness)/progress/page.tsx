@@ -8,6 +8,8 @@ import { detectPlateau } from '@/lib/engines/adaptation';
 import { getPatterns } from '@/lib/data/patterns';
 import { PatternsPanel } from '@/components/patterns-panel';
 import { scoreAdherence } from '@/lib/engines/adherence';
+import { getNutritionHistory } from '@/lib/data/nutrition-history';
+import { NutritionHistoryChart } from '@/components/nutrition-history-chart';
 
 export const metadata = { title: 'Progress — FitCoach' };
 
@@ -22,7 +24,11 @@ export const metadata = { title: 'Progress — FitCoach' };
  * chart is a misleading one — the same slope reads as steeper in a narrow box.
  */
 export default async function ProgressPage() {
-  const [day, patterns] = await Promise.all([getDayView(), getPatterns()]);
+  const [day, patterns, nutritionHistory] = await Promise.all([
+    getDayView(),
+    getPatterns(),
+    getNutritionHistory(),
+  ]);
   const { trend } = day;
   const points = trend.points;
 
@@ -140,6 +146,14 @@ export default async function ProgressPage() {
           </p>
         )}
       </Panel>
+
+      <div className="mt-4 lg:mt-5">
+        <Panel>
+          <Section title="This week's calories">
+            <NutritionHistoryChart history={nutritionHistory} targetKcal={day.targetKcal} />
+          </Section>
+        </Panel>
+      </div>
 
       {/* Full width: a finding is a sentence, and a sentence in a half column
           beside a form reads as a caption rather than a result. */}
