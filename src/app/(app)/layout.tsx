@@ -1,6 +1,10 @@
 import { redirect } from 'next/navigation';
 import { BottomNav, MobileHeader, Sidebar } from '@/components/app-nav';
 import { needsOnboarding } from '@/lib/data/onboarding-state';
+import { createClient } from '@/lib/supabase/server';
+import { supabaseConfigured } from '@/lib/config';
+import { getEnabledCategories } from '@/lib/data/categories';
+import { visibleCategories } from '@/lib/engines/categories';
 
 /**
  * The application shell.
@@ -29,9 +33,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding-name');
   }
 
+  let categories: ReturnType<typeof visibleCategories> = [];
+  if (supabaseConfigured) {
+    const supabase = await createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const enabled = await getEnabledCategories(supabase, auth.user.id);
+      categories = visibleCategories(enabled);
+    }
+  }
+
   return (
     <div className="min-h-dvh">
-      <Sidebar />
+      <Sidebar categories={categories} />
 
       <div className="lg:pl-(--sidebar-w)">
         <MobileHeader />
@@ -41,7 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </main>
       </div>
 
-      <BottomNav />
+      <BottomNav categories={categories} />
     </div>
   );
 }

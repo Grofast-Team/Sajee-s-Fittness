@@ -3,34 +3,62 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Apple,
+  Bell,
+  CheckSquare,
+  Droplet,
   Footprints,
   House,
+  LayoutDashboard,
   MessageCircleHeart,
+  MoreHorizontal,
   Settings,
-  TrendingUp, Wallet, } from 'lucide-react';
+  User,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 import { clsx } from 'clsx';
+import type { CategoryDefinition } from '@/lib/engines/categories';
 
 /**
  * Primary navigation.
  *
- * Five destinations, which is the practical ceiling for a bottom bar before
- * targets get too narrow to hit reliably, and enough for a sidebar to stay
- * scannable. Recipes, groceries and insights deliberately live inside these
- * five rather than beside them — a sidebar that grows with the backend is how
- * an app ends up with fourteen destinations and no obvious starting point.
+ * Categories are code-defined (src/lib/engines/categories.ts) and their
+ * icons are kebab-case strings there on purpose, so that module stays free
+ * of a framework dependency - this map is where a string becomes an actual
+ * component, exactly where that module's own comment said it should live.
  *
- * Icons always carry visible text labels. Icon-only navigation is a recognition
- * problem for exactly the beginner audience this app is for.
+ * Icons always carry visible text labels. Icon-only navigation is a
+ * recognition problem for exactly the beginner audience this app is for.
  */
-const ITEMS = [
-  { href: '/today', label: 'Today', Icon: House },
-  { href: '/food', label: 'Food', Icon: Apple },
-  { href: '/activity', label: 'Activity', Icon: Footprints },
-  { href: '/money', label: 'Money', Icon: Wallet },
-  { href: '/progress', label: 'Progress', Icon: TrendingUp },
-  { href: '/coach', label: 'Coach', Icon: MessageCircleHeart },
-] as const;
+const ICON_MAP: Record<string, LucideIcon> = {
+  wallet: Wallet,
+  footprints: Footprints,
+  bell: Bell,
+  'check-square': CheckSquare,
+  droplet: Droplet,
+  'message-circle-heart': MessageCircleHeart,
+};
+
+function resolveIcon(name: string): LucideIcon {
+  return ICON_MAP[name] ?? House;
+}
+
+/**
+ * How many top-level categories the mobile bottom bar shows directly
+ * before the rest move into "More". Dashboard occupies one of the five
+ * slots and More occupies another, leaving three for categories - the bar
+ * never grows past five items regardless of how many categories exist.
+ */
+const BOTTOM_NAV_PRIMARY_COUNT = 3;
+
+export function splitForBottomNav(
+  categories: CategoryDefinition[],
+): { primary: CategoryDefinition[]; overflow: CategoryDefinition[] } {
+  return {
+    primary: categories.slice(0, BOTTOM_NAV_PRIMARY_COUNT),
+    overflow: categories.slice(BOTTOM_NAV_PRIMARY_COUNT),
+  };
+}
 
 function useIsActive() {
   const pathname = usePathname();
@@ -68,11 +96,12 @@ function Wordmark() {
 /**
  * The desktop sidebar, from 1024px up.
  *
- * Settings sits at the foot rather than in the main list: it is a rare visit
- * compared to the daily five, and putting it in the same group would imply it
- * is somewhere you go every day.
+ * No ceiling here, unlike the bottom bar - vertical space accommodates
+ * every enabled category. Profile and Settings sit at the foot, alongside
+ * each other rather than folded into the main list: both are rare visits
+ * compared to the categories themselves.
  */
-export function Sidebar() {
+export function Sidebar({ categories }: { categories: CategoryDefinition[] }) {
   const isActive = useIsActive();
 
   return (
@@ -81,19 +110,37 @@ export function Sidebar() {
       style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}
     >
       <div className="px-5 py-6">
-        <Link href="/today" className="inline-flex" aria-label="FitCoach, go to today">
+        <Link href="/dashboard" className="inline-flex" aria-label="FitCoach, go to dashboard">
           <Wordmark />
         </Link>
       </div>
 
       <nav aria-label="Main" className="flex-1 px-3">
         <ul className="space-y-1">
-          {ITEMS.map(({ href, label, Icon }) => {
-            const active = isActive(href);
+          <li>
+            <Link
+              href="/dashboard"
+              aria-current={isActive('/dashboard') ? 'page' : undefined}
+              className={clsx(
+                'flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] transition-colors duration-200',
+                isActive('/dashboard') ? 'font-semibold' : 'font-medium hover:bg-[var(--bg)]',
+              )}
+              style={{
+                background: isActive('/dashboard') ? 'var(--primary-light)' : undefined,
+                color: isActive('/dashboard') ? 'var(--primary-dark)' : 'var(--fg-muted)',
+              }}
+            >
+              <LayoutDashboard size={19} strokeWidth={isActive('/dashboard') ? 2.3 : 1.9} aria-hidden />
+              Dashboard
+            </Link>
+          </li>
+          {categories.map(({ key, route, label, icon }) => {
+            const active = isActive(route);
+            const Icon = resolveIcon(icon);
             return (
-              <li key={href}>
+              <li key={key}>
                 <Link
-                  href={href}
+                  href={route}
                   aria-current={active ? 'page' : undefined}
                   className={clsx(
                     'flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] transition-colors duration-200',
@@ -113,19 +160,25 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="border-t px-3 py-3" style={{ borderColor: 'var(--line)' }}>
-        <Link
-          href="/settings"
-          aria-current={isActive('/settings') ? 'page' : undefined}
-          className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] font-medium transition-colors duration-200 hover:bg-[var(--bg)]"
-          style={{
-            background: isActive('/settings') ? 'var(--primary-light)' : undefined,
-            color: isActive('/settings') ? 'var(--primary-dark)' : 'var(--fg-muted)',
-          }}
-        >
-          <Settings size={19} strokeWidth={1.9} aria-hidden />
-          Settings
-        </Link>
+      <div className="border-t px-3 py-3 space-y-1" style={{ borderColor: 'var(--line)' }}>
+        {[
+          { href: '/profile', label: 'Profile', Icon: User },
+          { href: '/settings', label: 'Settings', Icon: Settings },
+        ].map(({ href, label, Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            aria-current={isActive(href) ? 'page' : undefined}
+            className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] font-medium transition-colors duration-200 hover:bg-[var(--bg)]"
+            style={{
+              background: isActive(href) ? 'var(--primary-light)' : undefined,
+              color: isActive(href) ? 'var(--primary-dark)' : 'var(--fg-muted)',
+            }}
+          >
+            <Icon size={19} strokeWidth={1.9} aria-hidden />
+            {label}
+          </Link>
+        ))}
       </div>
     </aside>
   );
@@ -146,7 +199,7 @@ export function MobileHeader() {
       }}
     >
       <div className="gutter flex h-14 items-center justify-between">
-        <Link href="/today" className="inline-flex" aria-label="FitCoach, go to today">
+        <Link href="/dashboard" className="inline-flex" aria-label="FitCoach, go to dashboard">
           <Wordmark />
         </Link>
         <Link
@@ -162,8 +215,15 @@ export function MobileHeader() {
   );
 }
 
-export function BottomNav() {
+export function BottomNav({ categories }: { categories: CategoryDefinition[] }) {
   const isActive = useIsActive();
+  const { primary } = splitForBottomNav(categories);
+
+  const items = [
+    { route: '/dashboard', label: 'Home', Icon: LayoutDashboard },
+    ...primary.map((c) => ({ route: c.route, label: c.label, Icon: resolveIcon(c.icon) })),
+    { route: '/more', label: 'More', Icon: MoreHorizontal },
+  ];
 
   return (
     <nav
@@ -176,12 +236,12 @@ export function BottomNav() {
       }}
     >
       <ul className="mx-auto flex max-w-2xl">
-        {ITEMS.map(({ href, label, Icon }) => {
-          const active = isActive(href);
+        {items.map(({ route, label, Icon }) => {
+          const active = isActive(route);
           return (
-            <li key={href} className="flex-1">
+            <li key={route} className="flex-1">
               <Link
-                href={href}
+                href={route}
                 aria-current={active ? 'page' : undefined}
                 className="flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium transition-colors duration-200"
                 style={{ color: active ? 'var(--primary)' : 'var(--fg-subtle)' }}
